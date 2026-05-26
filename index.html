@@ -9,7 +9,7 @@
     <!-- 引入專業單線條圖示庫 -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- 引入 LINE LIFF SDK -->
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         :root {
             --gold-light: #FDE047;
@@ -125,18 +125,24 @@
                 <!-- 裝飾光暈 -->
                 <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#D4AF37] rounded-full opacity-10 blur-3xl pointer-events-none"></div>
 
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <p class="text-xs text-[#D4AF37] font-bold tracking-widest mb-1 drop-shadow-sm">VIP PRIVILEGE</p>
-                        <p class="text-base text-white font-bold tracking-wide">尊榮禮遇進度</p>
+                <div class="flex justify-between items-start mb-4 relative z-10">
+                    <div class="flex items-center space-x-3">
+                        <!-- LINE 頭像預留區 -->
+                        <div id="profile-picture" class="w-11 h-11 rounded-full bg-gray-800 border border-[#D4AF37]/50 overflow-hidden shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                            <svg class="w-full h-full text-gray-500 p-2" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-[#D4AF37] font-bold tracking-widest mb-0.5 drop-shadow-sm" id="profile-name">VIP GUEST</p>
+                            <p class="text-sm text-white font-bold tracking-wide">尊榮禮遇進度</p>
+                        </div>
                     </div>
                     <div class="flex items-center space-x-1.5 px-2 py-1 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/30">
                         <div class="w-1.5 h-1.5 bg-[#FDE047] rounded-full animate-pulse shadow-[0_0_5px_#FDE047]"></div>
-                        <p class="text-[11px] font-medium text-[#D4AF37] tracking-wider">連線認證</p>
+                        <p class="text-[11px] font-medium text-[#D4AF37] tracking-wider" id="liff-status">等待連線</p>
                     </div>
                 </div>
 
-                <div class="flex items-end space-x-2 relative z-10">
+                <div class="flex items-end space-x-2 relative z-10 mt-2">
                     <p class="text-6xl font-eng-elegant text-white drop-shadow-lg">
                         <span id="current-points">0</span> 
                     </p>
@@ -243,26 +249,43 @@
             // 初始化 Lucide 圖示庫
             lucide.createIcons();
 
-            // --- LINE LIFF 初始化設定 ---
-            const myLiffId = "YOUR_LIFF_ID"; // 👉 稍後部署完，請將這裡換成 LINE 後台取得的真實 LIFF ID
-
+            // ==========================================
+            // LINE LIFF 初始化設定 (部署後請填入您的 LIFF ID)
+            // ==========================================
+            const MY_LIFF_ID = "2010201034-vFJoUzRg"; // TODO: 在這裡填入 LINE Developers 取得的 LIFF ID
+            
             async function initializeLiff() {
+                if (!MY_LIFF_ID) {
+                    console.log("尚未設定 LIFF ID，使用網頁預設模式");
+                    return;
+                }
+                
                 try {
-                    await liff.init({ liffId: myLiffId });
-                    console.log("LIFF 初始化成功");
-                    // 如果客戶在外部瀏覽器打開，引導他們登入 LINE (Demo 時可視需求開啟)
-                    if (!liff.isLoggedIn() && !liff.isInClient()) {
-                        // liff.login(); 
+                    await liff.init({ liffId: MY_LIFF_ID });
+                    if (liff.isLoggedIn()) {
+                        const profile = await liff.getProfile();
+                        // 替換名字與頭像
+                        document.getElementById('profile-name').innerText = profile.displayName;
+                        if (profile.pictureUrl) {
+                            document.getElementById('profile-picture').innerHTML = `<img src="${profile.pictureUrl}" alt="Profile" class="w-full h-full object-cover">`;
+                        }
+                        document.getElementById('liff-status').innerText = "已連線";
+                        document.getElementById('liff-status').previousElementSibling.classList.replace('bg-[#FDE047]', 'bg-green-400');
+                        document.getElementById('liff-status').previousElementSibling.classList.replace('shadow-[0_0_5px_#FDE047]', 'shadow-[0_0_5px_#4ade80]');
+                    } else {
+                        // 如果是在 LINE App 裡面但沒登入，強制登入
+                        if (liff.isInClient()) {
+                            liff.login();
+                        }
                     }
                 } catch (err) {
-                    console.error("LIFF 初始化失敗 (請確認 ID 與網址設定):", err);
+                    console.error('LIFF Initialization failed', err);
                 }
             }
             
-            // 防呆機制：只有在您填入真實 LIFF ID 時才啟動，避免您現在本機測試時報錯
-            if (myLiffId !== "YOUR_LIFF_ID") {
-                initializeLiff();
-            }
+            // 啟動 LIFF
+            initializeLiff();
+
 
             const MAX_POINTS = 8;
             let currentPoints = 0;
@@ -287,7 +310,7 @@
             const rBadge = document.getElementById('reward-badge');
             const rTitle = document.getElementById('reward-title');
             const rDesc = document.getElementById('reward-desc');
-            const rLucide = document.getElementById('reward-lucide');
+            const rIconContainer = document.getElementById('reward-icon-container');
             const rAuthCode = document.getElementById('auth-code');
 
             // --- 初始化集點卡格子 (深色質感框) ---
@@ -370,13 +393,13 @@
                     rTitle.innerText = '尊享精品手沖咖啡';
                     rDesc.innerText = '您已成功集滿 3 點。憑此專屬憑證，誠摯邀請您至貴賓休息區享用品牌訂製濾掛咖啡禮盒。';
                     rAuthCode.innerText = 'FT-TPE-26A';
-                    rLucide.setAttribute('data-lucide', 'coffee');
+                    rIconContainer.innerHTML = '<i data-lucide="coffee" class="w-16 h-16 text-[#D4AF37]"></i>';
                 } else if (level === 8) {
                     rBadge.innerText = 'ULTIMATE PRIVILEGE';
                     rTitle.innerText = '限量純金紀念金幣';
                     rDesc.innerText = '恭喜您完成科技展全區巡禮。請持此黑卡憑證至主辦中心，將有專人為您奉上 2026 限量純金紀念幣。';
                     rAuthCode.innerText = 'FT-GOLD-V1';
-                    rLucide.setAttribute('data-lucide', 'coins');
+                    rIconContainer.innerHTML = '<i data-lucide="coins" class="w-16 h-16 text-[#D4AF37]"></i>';
                 }
 
                 // 替換 Icon 前需重新生成
