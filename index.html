@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FinTech Taipei 2026 - 尊榮集點</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;600;700&family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+    <!-- 引入專業單線條圖示庫 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 引入 LINE LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root {
+            --gold-light: #FDE047;
+            --gold-main: #D4AF37;
+            --gold-dark: #9CA3AF; /* Used for inactive */
+            --navy-bg: #0B1120;
+            --navy-card: #111827;
+        }
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #000;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            color: #E5E7EB;
+        }
+        
+        /* 標題與強調字使用宋體與英文字體，營造高級感 */
+        .font-elegant {
+            font-family: 'Noto Serif TC', serif;
+        }
+        .font-eng-elegant {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* 模擬 LIFF 視窗大小 */
+        @media (min-width: 640px) {
+            body {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background-image: radial-gradient(circle at center, #1f2937 0%, #000 100%);
+            }
+            #app-container {
+                width: 375px;
+                height: 812px;
+                border-radius: 2rem;
+                overflow: hidden;
+                box-shadow: 0 25px 50px -12px rgba(212, 175, 55, 0.15);
+                position: relative;
+            }
+        }
+
+        /* 尊榮深色拉絲金屬紋理背景 */
+        .premium-bg {
+            background-color: var(--navy-bg);
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* 金色漸層文字 */
+        .text-gold-gradient {
+            background: linear-gradient(135deg, #FDE047 0%, #D4AF37 50%, #B45309 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* 金色發光邊框 */
+        .gold-glow-border {
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            box-shadow: inset 0 0 20px rgba(212, 175, 55, 0.05);
+        }
+
+        /* 相機掃描遮罩 (金線版) */
+        #scanner-overlay {
+            backdrop-filter: blur(8px);
+            transition: opacity 0.4s ease;
+        }
+        .scan-line {
+            width: 100%;
+            height: 1px;
+            background: var(--gold-main);
+            box-shadow: 0 0 15px var(--gold-light), 0 0 30px var(--gold-main);
+            position: absolute;
+            top: 0;
+            animation: scan 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes scan {
+            0% { top: 0; opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        /* 優雅的蓋章動畫 (淡入浮現) */
+        @keyframes elegantFadeIn {
+            0% { transform: scale(0.9); opacity: 0; filter: brightness(2); }
+            100% { transform: scale(1); opacity: 1; filter: brightness(1); }
+        }
+        .stamp-animate {
+            animation: elegantFadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app-container" class="w-full h-screen sm:h-full flex flex-col relative overflow-y-auto premium-bg">
+        
+        <!-- Header -->
+        <header class="bg-[#0B1120]/90 backdrop-blur-xl border-b border-[#D4AF37]/20 p-5 sticky top-0 z-10 flex flex-col items-center justify-center shadow-md">
+            <h1 class="text-2xl font-eng-elegant tracking-[0.15em] text-gold-gradient font-bold mb-1 drop-shadow-md">FINTECH TAIPEI</h1>
+            <h2 class="text-sm font-bold text-gray-200 tracking-widest drop-shadow-sm">2026 台北金融科技展</h2>
+        </header>
+
+        <main class="flex-1 p-5 pb-44 relative z-10">
+            
+            <!-- 使用者進度資訊卡片 (尊榮黑金卡) -->
+            <div class="bg-gradient-to-br from-[#1F2937] to-[#111827] rounded-2xl p-6 mb-6 flex flex-col relative overflow-hidden gold-glow-border shadow-2xl">
+                <!-- 裝飾光暈 -->
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#D4AF37] rounded-full opacity-10 blur-3xl pointer-events-none"></div>
+
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-xs text-[#D4AF37] font-bold tracking-widest mb-1 drop-shadow-sm">VIP PRIVILEGE</p>
+                        <p class="text-base text-white font-bold tracking-wide">尊榮禮遇進度</p>
+                    </div>
+                    <div class="flex items-center space-x-1.5 px-2 py-1 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/30">
+                        <div class="w-1.5 h-1.5 bg-[#FDE047] rounded-full animate-pulse shadow-[0_0_5px_#FDE047]"></div>
+                        <p class="text-[11px] font-medium text-[#D4AF37] tracking-wider">連線認證</p>
+                    </div>
+                </div>
+
+                <div class="flex items-end space-x-2 relative z-10">
+                    <p class="text-6xl font-eng-elegant text-white drop-shadow-lg">
+                        <span id="current-points">0</span> 
+                    </p>
+                    <p class="text-2xl font-eng-elegant text-gray-400 mb-1 font-bold">/ 8</p>
+                </div>
+            </div>
+
+            <!-- 集點區域清單 -->
+            <div class="bg-[#111827]/80 rounded-2xl p-6 shadow-lg border border-gray-800 mb-6 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-base font-bold text-gray-100 tracking-wider">科技展主題展區</h2>
+                    <span class="text-[11px] text-gray-400 font-eng-elegant tracking-widest font-bold">EXHIBITION TOUR</span>
+                </div>
+                
+                <!-- 8 個集點格子的 Grid -->
+                <div class="grid grid-cols-4 gap-3" id="stamp-grid">
+                    <!-- 格子會由 JavaScript 動態產生 -->
+                </div>
+                
+                <div class="mt-6 pt-5 border-t border-gray-800">
+                    <p class="text-sm text-center text-gray-300 leading-relaxed font-medium tracking-wide">
+                        集滿 <span class="text-[#D4AF37] font-eng-elegant text-lg font-bold mx-1 drop-shadow-sm">3</span> 點享專屬手沖咖啡禮遇<br>
+                        集滿 <span class="text-[#D4AF37] font-eng-elegant text-lg font-bold mx-1 drop-shadow-sm">8</span> 點兌換限量純金紀念幣
+                    </p>
+                </div>
+            </div>
+
+            <!-- 獎品進度提示 (低調奢華風格) -->
+            <div class="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-4 flex items-start space-x-3 backdrop-blur-md shadow-lg">
+                <i data-lucide="award" class="w-5 h-5 text-[#D4AF37] mt-0.5 flex-shrink-0 drop-shadow-sm"></i>
+                <p id="reward-hint" class="text-sm leading-relaxed text-gray-200 tracking-wide font-medium">
+                    距離首要尊榮禮遇僅差 <strong class="font-eng-elegant text-[#D4AF37] text-lg mx-1 drop-shadow-sm">3</strong> 點，誠摯邀請您繼續探索。
+                </p>
+            </div>
+
+        </main>
+
+        <!-- 底部固定按鈕區 -->
+        <div class="fixed bottom-0 left-0 w-full sm:absolute sm:bottom-0 sm:left-auto sm:w-[375px] px-6 pt-8 pb-3 bg-gradient-to-t from-[#000] via-[#0B1120]/95 to-transparent z-20">
+            <button id="btn-scan" class="w-full bg-gradient-to-r from-[#B45309] via-[#D4AF37] to-[#B45309] hover:brightness-110 active:scale-95 text-[#000] font-bold text-lg tracking-widest py-4 rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.3)] transition-all flex justify-center items-center space-x-3">
+                <i data-lucide="scan-line" class="w-6 h-6"></i>
+                <span>啟動專屬掃描</span>
+            </button>
+        </div>
+
+        <!-- 掃描相機模擬遮罩 (細緻金線版) -->
+        <div id="scanner-overlay" class="absolute inset-0 bg-[#0B1120]/95 z-30 flex flex-col justify-center items-center hidden">
+            <!-- 尊榮準星 -->
+            <div class="w-64 h-64 relative">
+                <!-- 掃描線 -->
+                <div class="scan-line"></div>
+                <!-- 準星邊角 -->
+                <div class="absolute top-0 left-0 w-8 h-8 border-t border-l border-[#D4AF37]"></div>
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-[#D4AF37]"></div>
+                <div class="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-[#D4AF37]"></div>
+                <div class="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-[#D4AF37]"></div>
+            </div>
+            <p class="text-[#D4AF37] mt-10 tracking-[0.15em] text-base font-bold drop-shadow-md">請將特權條碼對準框內</p>
+            
+            <button id="btn-cancel-scan" class="mt-12 px-8 py-2.5 bg-transparent border border-gray-500 text-gray-300 rounded-full text-sm font-medium tracking-widest hover:text-[#D4AF37] hover:border-[#D4AF37] transition-all">取消</button>
+        </div>
+
+        <!-- 獎勵兌換彈跳視窗 (頂級黑卡風格) -->
+        <div id="reward-modal" class="absolute inset-0 bg-black/85 backdrop-blur-md z-40 flex justify-center items-center p-5 hidden opacity-0 transition-opacity duration-500">
+            <div class="bg-gradient-to-b from-[#1F2937] to-[#0B1120] border border-[#D4AF37]/40 rounded-xl w-full max-w-sm overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] transform scale-95 transition-transform duration-500" id="reward-modal-content">
+                
+                <!-- 卡片上方視覺 (香檳金質感底) -->
+                <div id="reward-image-bg" class="h-44 bg-gradient-to-tr from-[#3b2a0c] to-[#1a1508] flex justify-center items-center relative overflow-hidden border-b border-[#D4AF37]/20">
+                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiNkNGFmMzciIGZpbGwtb3BhY2l0eT0iMC4xIi8+PC9zdmc+')]"></div>
+                    <!-- 替換為大 Icon -->
+                    <div id="reward-icon-container" class="relative z-10 p-5 rounded-full bg-black/30 border border-[#D4AF37]/30 shadow-[0_0_30px_rgba(212,175,55,0.2)]">
+                        <i data-lucide="coffee" id="reward-lucide" class="w-16 h-16 text-[#D4AF37]"></i>
+                    </div>
+                </div>
+                
+                <!-- 卡片內容 -->
+                <div class="p-8 text-center relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-[#D4AF37] text-black text-xs font-bold tracking-widest uppercase rounded shadow-md" id="reward-badge">Tier 1 Unlocked</div>
+                    
+                    <h3 class="text-2xl font-elegant text-gold-gradient font-bold mt-4 mb-3 drop-shadow-sm" id="reward-title">尊享精品手沖咖啡</h3>
+                    <p class="text-gray-300 mb-8 text-sm leading-relaxed tracking-wide font-medium" id="reward-desc">您已成功集滿 3 點。憑此專屬憑證，誠摯邀請您至貴賓休息區享用訂製濾掛咖啡禮盒。</p>
+                    
+                    <div class="border-t border-b border-gray-700 py-4 mb-6 relative bg-black/20">
+                        <div class="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-black rounded-full shadow-inner"></div>
+                        <div class="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-black rounded-full shadow-inner"></div>
+                        
+                        <p class="text-[11px] text-gray-400 mb-2 font-eng-elegant tracking-[0.2em] font-bold">AUTHORIZATION CODE</p>
+                        <div class="font-eng-elegant text-2xl tracking-[0.25em] text-white drop-shadow-md" id="auth-code">
+                            GLB-W-26A
+                        </div>
+                    </div>
+
+                    <button id="btn-close-modal" class="w-full bg-[#111827] border border-[#D4AF37]/50 hover:bg-[#D4AF37]/20 text-[#D4AF37] text-sm font-bold tracking-widest py-4 rounded-lg transition-all shadow-md">
+                        確認並收妥憑證
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化 Lucide 圖示庫
+            lucide.createIcons();
+
+            // --- LINE LIFF 初始化設定 ---
+            const myLiffId = "YOUR_LIFF_ID"; // 👉 稍後部署完，請將這裡換成 LINE 後台取得的真實 LIFF ID
+
+            async function initializeLiff() {
+                try {
+                    await liff.init({ liffId: myLiffId });
+                    console.log("LIFF 初始化成功");
+                    // 如果客戶在外部瀏覽器打開，引導他們登入 LINE (Demo 時可視需求開啟)
+                    if (!liff.isLoggedIn() && !liff.isInClient()) {
+                        // liff.login(); 
+                    }
+                } catch (err) {
+                    console.error("LIFF 初始化失敗 (請確認 ID 與網址設定):", err);
+                }
+            }
+            
+            // 防呆機制：只有在您填入真實 LIFF ID 時才啟動，避免您現在本機測試時報錯
+            if (myLiffId !== "YOUR_LIFF_ID") {
+                initializeLiff();
+            }
+
+            const MAX_POINTS = 8;
+            let currentPoints = 0;
+            
+            // 金融專屬展場區域設定
+            const boothNames = ['財富管理', '數位理財', '永續金融', '企業金融', '信託傳承', '智能理專', '尊榮用卡', '貴賓特區'];
+            // 對應 Lucide icon 名稱
+            const boothIcons = ['briefcase', 'smartphone', 'leaf', 'building-2', 'scroll', 'bot', 'credit-card', 'gem'];
+
+            const stampGrid = document.getElementById('stamp-grid');
+            const pointsDisplay = document.getElementById('current-points');
+            const hintDisplay = document.getElementById('reward-hint');
+            
+            const btnScan = document.getElementById('btn-scan');
+            const scannerOverlay = document.getElementById('scanner-overlay');
+            const btnCancelScan = document.getElementById('btn-cancel-scan');
+            
+            const rewardModal = document.getElementById('reward-modal');
+            const rewardModalContent = document.getElementById('reward-modal-content');
+            const btnCloseModal = document.getElementById('btn-close-modal');
+            
+            const rBadge = document.getElementById('reward-badge');
+            const rTitle = document.getElementById('reward-title');
+            const rDesc = document.getElementById('reward-desc');
+            const rLucide = document.getElementById('reward-lucide');
+            const rAuthCode = document.getElementById('auth-code');
+
+            // --- 初始化集點卡格子 (深色質感框) ---
+            function initGrid() {
+                stampGrid.innerHTML = '';
+                for (let i = 1; i <= MAX_POINTS; i++) {
+                    const cell = document.createElement('div');
+                    // 預設未解鎖狀態：深灰框、透明底
+                    cell.className = 'aspect-square rounded border border-gray-800 flex justify-center items-center bg-[#111827]/50 relative transition-all duration-500';
+                    cell.id = `stamp-cell-${i}`;
+                    
+                    // 顯示暗色數字
+                    const num = document.createElement('span');
+                    num.className = 'text-gray-600 font-eng-elegant text-2xl font-bold';
+                    num.innerText = `0${i}`;
+                    cell.appendChild(num);
+                    
+                    stampGrid.appendChild(cell);
+                }
+            }
+
+            // --- 更新介面提示 (尊榮語氣) ---
+            function updateHints() {
+                pointsDisplay.innerText = currentPoints;
+                
+                if (currentPoints < 3) {
+                    hintDisplay.innerHTML = `距離首要尊榮禮遇僅差 <strong class="font-eng-elegant text-[#D4AF37] text-lg mx-1 drop-shadow-sm">${3 - currentPoints}</strong> 點，誠摯邀請您繼續探索。`;
+                } else if (currentPoints >= 3 && currentPoints < 8) {
+                    hintDisplay.innerHTML = `已為您保留專屬禮遇。集滿最後 <strong class="font-eng-elegant text-[#D4AF37] text-lg mx-1 drop-shadow-sm">${8 - currentPoints}</strong> 點即可兌換純金紀念幣。`;
+                } else {
+                    hintDisplay.innerHTML = `<span class="text-[#D4AF37] font-bold text-base drop-shadow-sm">特權任務已全數完成，請由專員為您安排最終兌換。</span>`;
+                }
+            }
+
+            // --- 執行「數位解鎖/蓋章」動作 (優雅淡入版) ---
+            function addStamp() {
+                if (currentPoints >= MAX_POINTS) return;
+
+                currentPoints++;
+                const cell = document.getElementById(`stamp-cell-${currentPoints}`);
+                
+                cell.innerHTML = ''; // 移除數字
+                
+                // 替換為解鎖狀態：金色細邊框、微發光底色
+                cell.classList.remove('border-gray-800', 'bg-[#111827]/50');
+                cell.classList.add('border-[#D4AF37]/60', 'bg-gradient-to-br', 'from-[#D4AF37]/10', 'to-transparent', 'stamp-animate');
+                
+                const stampIcon = document.createElement('div');
+                stampIcon.className = 'flex flex-col items-center justify-center w-full h-full p-1';
+                
+                const areaName = boothNames[currentPoints - 1]; 
+                const customIconName = boothIcons[currentPoints - 1];
+                
+                // 放入單線條向量 Icon 與優雅字體
+                stampIcon.innerHTML = `
+                    <i data-lucide="${customIconName}" class="w-7 h-7 text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"></i>
+                    <span class="text-[11px] font-bold text-gray-200 mt-2 tracking-wider whitespace-nowrap drop-shadow-sm">${areaName}</span>
+                `;
+                cell.appendChild(stampIcon);
+
+                // 重新渲染新加入的 Lucide icons
+                lucide.createIcons();
+
+                updateHints();
+                checkRewards();
+            }
+
+            // --- 檢查是否達到兌換門檻 ---
+            function checkRewards() {
+                setTimeout(() => {
+                    if (currentPoints === 3) showRewardModal(3);
+                    else if (currentPoints === 8) showRewardModal(8);
+                }, 1000); // 延遲稍微拉長，讓蓋章動畫跑完，更顯從容
+            }
+
+            // --- 顯示獎品推播彈窗 (尊榮黑卡風格) ---
+            function showRewardModal(level) {
+                if (level === 3) {
+                    rBadge.innerText = 'TIER 1 PRIVILEGE';
+                    rTitle.innerText = '尊享精品手沖咖啡';
+                    rDesc.innerText = '您已成功集滿 3 點。憑此專屬憑證，誠摯邀請您至貴賓休息區享用品牌訂製濾掛咖啡禮盒。';
+                    rAuthCode.innerText = 'FT-TPE-26A';
+                    rLucide.setAttribute('data-lucide', 'coffee');
+                } else if (level === 8) {
+                    rBadge.innerText = 'ULTIMATE PRIVILEGE';
+                    rTitle.innerText = '限量純金紀念金幣';
+                    rDesc.innerText = '恭喜您完成科技展全區巡禮。請持此黑卡憑證至主辦中心，將有專人為您奉上 2026 限量純金紀念幣。';
+                    rAuthCode.innerText = 'FT-GOLD-V1';
+                    rLucide.setAttribute('data-lucide', 'coins');
+                }
+
+                // 替換 Icon 前需重新生成
+                lucide.createIcons();
+
+                rewardModal.classList.remove('hidden');
+                setTimeout(() => {
+                    rewardModal.classList.remove('opacity-0');
+                    rewardModalContent.classList.remove('scale-95');
+                }, 50);
+            }
+
+            function hideRewardModal() {
+                rewardModal.classList.add('opacity-0');
+                rewardModalContent.classList.add('scale-95');
+                setTimeout(() => rewardModal.classList.add('hidden'), 500);
+            }
+
+            // --- 綁定事件 ---
+            btnScan.addEventListener('click', () => {
+                scannerOverlay.classList.remove('hidden');
+                window.scanTimeout = setTimeout(() => {
+                    scannerOverlay.classList.add('hidden');
+                    addStamp();
+                }, 1800); // 掃描時間稍微拉長營造「核對身份」的專業感
+            });
+
+            btnCancelScan.addEventListener('click', () => {
+                clearTimeout(window.scanTimeout);
+                scannerOverlay.classList.add('hidden');
+            });
+
+            btnCloseModal.addEventListener('click', hideRewardModal);
+
+            initGrid();
+            updateHints();
+        });
+    </script>
+</body>
+</html>
