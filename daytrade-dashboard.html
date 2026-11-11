@@ -70,7 +70,11 @@ if(!config.configured){stext("pushState","伺服器推播尚未設定。");retur
 if(isIOS()&&!isStandalone()){stext("pushState","請先用 Safari「分享 → 加入主畫面」，再從主畫面開啟本系統。");return;}
 if(!("PushManager"in window)||!("Notification"in window)){stext("pushState","這個瀏覽器目前不支援 Web Push。");return;}
 const reg=await getPushReg();const sub=await reg.pushManager.getSubscription();
-stext("pushState",sub?"這台裝置已有訂閱（通知權限："+Notification.permission+"）":"尚未訂閱（通知權限："+Notification.permission+"）");
+if(sub && Notification.permission==="granted"){
+ const res=await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub.toJSON())});
+ if(!res.ok)throw Error("推播重新登記失敗："+res.status);
+}
+stext("pushState",sub?"這台裝置已有訂閱並已同步伺服器（通知權限："+Notification.permission+"）":"尚未訂閱（通知權限："+Notification.permission+"）");
 }catch(e){stext("pushState","網頁推播檢查失敗："+e.message)}}
 $("pushEnable").onclick=async()=>{try{
 if(isIOS()&&!isStandalone())throw Error("請先加入 iPhone 主畫面，再從主畫面開啟。");
