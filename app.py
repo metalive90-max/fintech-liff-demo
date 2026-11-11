@@ -3,6 +3,7 @@ import os, json, time, base64, secrets, asyncio, logging, math, sqlite3, re
 from pathlib import Path
 from urllib.parse import urlparse
 from pywebpush import webpush, WebPushException
+from py_vapid import Vapid
 from datetime import datetime, timedelta, time as dtime
 from zoneinfo import ZoneInfo
 from collections import defaultdict, deque
@@ -357,7 +358,7 @@ def push_to_subscribers(event,title,body):
  if not push_enabled():return {"sent":0,"failed":0}
  with db() as c:
   rows=c.execute("SELECT endpoint,subscription_json FROM push_subscriptions LIMIT 50").fetchall()
- try:private=base64.b64decode(VAPID_PRIVATE_B64).decode()
+ try:private=Vapid.from_pem(base64.b64decode(VAPID_PRIVATE_B64))
  except Exception:return {"sent":0,"failed":len(rows),"error":"VAPID config"}
  sent=failed=0
  for endpoint,raw in rows:
@@ -370,7 +371,7 @@ def push_to_subscribers(event,title,body):
    failed+=1
    if getattr(getattr(exc,"response",None),"status_code",0) in (404,410):
     with db() as c:c.execute("DELETE FROM push_subscriptions WHERE endpoint=?",(endpoint,))
-   log.warning("Web Push delivery error: %s",type(exc).__name__)
+   log.warning("Web Push delivery error: %s %s",type(exc).__name__,str(exc)[:240])
   except Exception as exc:
    failed+=1;log.warning("Web Push delivery error: %s",type(exc).__name__)
  return {"sent":sent,"failed":failed,"subscribers":len(rows)}
