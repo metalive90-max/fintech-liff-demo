@@ -378,5 +378,6 @@ def push_to_subscribers(event,title,body):
 @app.post("/api/push/test")
 async def push_test():
  if not push_enabled():return {"ok":False,"message":"網頁推播尚未完成設定"}
+ if push_record_count()==0:return {"ok":False,"message":"尚無任何已訂閱裝置。請先按「啟用網頁推播」，確認顯示已訂閱，再測試。"}
  res=await asyncio.to_thread(push_to_subscribers,"測試","通知測試","這是測試通知，不是買入訊號。")
  return {"ok":res["sent"]>0,"message":f"推播服務回報已接受 {res['sent']} 筆、失敗 {res['failed']} 筆。是否實際顯示仍受裝置通知設定影響。"}
