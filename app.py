@@ -136,28 +136,44 @@ def sector_rank():
   cr=num(q,"change_rate")
   if cr is not None: grouped[WATCH[q["stock_id"]][1]].append(cr)
  return sorted([{"sector":name,"average_change_rate":round(sum(v)/len(v),2),"stocks":len(v),"coverage":sum(1 for sid in WATCH if WATCH[sid][1]==name)} for name,v in grouped.items()],key=lambda x:x["average_change_rate"],reverse=True)
+DECISION_POLICY={
+ "version":"1.0","role":"AI 首席交易決策官（規則式決策輔助，非保證預測）",
+ "levels":[{"code":"A","name":"可試單","meaning":"即時行情及價量訊號符合規則，費稅滑價後風險在限額內；仍需自行確認券商當沖資格與大盤"},
+ {"code":"B","name":"觀察","meaning":"潛在機會，尚缺量價、趨勢或風險條件"},
+ {"code":"C","name":"不追價","meaning":"價格過度偏離均價、靠近壓力或報酬風險不合理"},
+ {"code":"D","name":"取消交易","meaning":"關鍵支撐失守或交易風險超出限制"},
+ {"code":"E","name":"資料不足","meaning":"休市、資料延遲、K線或正式授權不完整"}],
+ "principles":["資料必須有可信來源與時間戳","不強迫交易或追價","每筆先算最壞風險含交易成本與滑價","8成以上曝險不是理由，額度上限80萬元","單日虧損預算10000元，非券商強制停損","不保證獲利，不得呼叫自動下單"],
+ "auto_order":False,"signal_model":"規則式（尚未導入/驗證機器學習模型）"}
 def signal(q):
  sid=q["stock_id"]
  close=num(q,"close");avg=num(q,"average_price");high=num(q,"high")
  lo=num(q,"low");ratio=num(q,"volume_ratio")
- h=list(history[sid])
- if not fresh(q):return "資料過期","行情時間戳已超過90秒",None
- if not market_open():return "非交易時段","盤後行情僅供參考",None
- if not all(v and v>0 for v in (close,avg,high,lo)):return "觀察","價格資料不完整",None
- if not h or len(h)<4:return "觀察","累積有效快照不足，無法判斷動能",None
- if not q.get("five_min_confirmed") or (q.get("candle_count") or 0)<5:return "觀察","尚未有完整5分鐘K線價量確認",None
- earlier=h[-4][1]
- # Not a guaranteed fill or technical 5-minute bar; only snapshot based heuristic.
- momentum=(close-earlier)/earlier if earlier else 0
+ hist=list(history[sid])
+ if not fresh(q):return "資料不足","E｜行情資料過期或缺少有效時間戳",None
+ if not market_open():return "資料不足","E｜非交易時段；不發出買點",None
+ if not all(v and v>0 for v in (close,avg,high,lo)):return "資料不足","E｜價格資料不完整",None
+ if not q.get("five_min_confirmed") or (q.get("candle_count") or 0)<5:
+  return "觀察","B｜5分鐘K線尚未完成價量確認",None
  if close<avg*.992:
-  return "轉弱警戒","現價低於日內成交均價0.8%以上",None
- if close>avg*1.002 and momentum>.002 and ratio is not None and ratio>=.55:
+  return "取消交易","D｜跌破當日均價0.8%，短線轉弱",None
+ if not hist or len(hist)<4:return "觀察","B｜需要至少四筆有效快照評估動能",None
+ earlier=hist[-4][1]
+ momentum=(close-earlier)/earlier if earlier else 0
+ if close>avg*1.025:
+  return "不追價","C｜股價高於日內均價2.5%，不追高",None
+ if close>avg*1.002 and momentum>.002 and ratio is not None and ratio>=1.2:
   stop=min(avg,close*.989)
   target=close+2.0*(close-stop)
   rv=risk_values(close,stop,target,1)
-  if rv["passes"] and rv["risk_reward"]>=1.5:
-   return "候選訊號","價量快照轉強；尚須人工確認盤中K線、當沖資格及委託風險",{"entry":round(close,2),"stop":round(stop,2),"target":round(target,2),"lots":1,"risk":rv["risk_including_buffer"]}
- return "觀察","尚未符合價量快照條件",None
+  if not rv["passes"]:return "取消交易","D｜預估含費稅滑價風險或資金限制未通過",None
+  if rv["risk_reward"] is None or rv["risk_reward"]<1.5:
+   return "不追價","C｜報酬風險比未達1.5",None
+  return "候選訊號","A｜技術條件符合；須人工確認大盤、當沖資格及流動性",{
+   "entry":round(close,2),"stop":round(stop,2),"target":round(target,2),
+   "lots":1,"risk":rv["risk_including_buffer"],"risk_reward":rv["risk_reward"],
+   "source_time":q.get("date"),"fees_and_slippage_included":True}
+ return "觀察","B｜尚未符合價量突破與成交量條件",None
 def timestamp_to_local(ts):
  try:
   if not isinstance(ts,(int,float)) or ts<=0:return None
@@ -287,7 +303,7 @@ async def monitor_once():
   close=num(item,"close")
   if close and fresh(item):history[sid].append((t,close))
   state,reason,setup=signal(item)
-  if state in ("候選訊號","轉弱警戒") and market_open():
+  if state in ("候選訊號","取消交易") and market_open():
    key=f"{local_date()}:{sid}:{state}"
    prev_alert=sent_alerts.get(key,0)
    if time.time()-prev_alert>1800:
@@ -336,6 +352,8 @@ async def auth(request:Request,call_next):
 def health():return {"ok":True,"auto_order":False,"market_data_connected":bool(FUGLE_API_KEY and market_quotes())}
 @app.get("/",response_class=HTMLResponse)
 def home():return (ROOT/"daytrade-dashboard.html").read_text(encoding="utf-8")
+@app.get("/api/policy")
+def get_policy():return DECISION_POLICY
 @app.get("/api/status")
 def status():
  book=ledger();groups=sector_rank()
@@ -352,7 +370,7 @@ def status():
  "provider_vwap_type":"Fugle avgPrice 當日成交均價（非自行重建逐筆 VWAP）",
  "market_message":cache["error"] or ("盤中行情已連線" if market_quotes() else "尚無當日新鮮快照；禁止買進提示"),
  "last_fetch":cache["last_fetch"],"public_reference":{"source":"TWSE STOCK_DAY_ALL 盤後","as_of":public_state["as_of"],"error":public_state["error"],"symbols":public_state["references"]},"auto_order":False,"capital_limit":CAPITAL,"daily_loss_limit":DAILY_LOSS,"max_lots":MAX_LOTS,
- "telegram_configured":bool(TG_TOKEN and TG_CHAT),"webpush_configured":bool(VAPID_PRIVATE_B64 and VAPID_PUBLIC),"persistence":book["persistent"],
+ "policy":DECISION_POLICY,"telegram_configured":bool(TG_TOKEN and TG_CHAT),"webpush_configured":bool(VAPID_PRIVATE_B64 and VAPID_PUBLIC),"persistence":book["persistent"],
  "ledger":{k:v for k,v in book.items() if k!="trades"},"sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10]}
 class RiskRequest(BaseModel):
  entry:float=Field(gt=0)
