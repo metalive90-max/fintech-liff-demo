@@ -11,8 +11,8 @@ input[type=checkbox]{width:auto;min-height:0;margin-right:8px}button{background:
 #result,#ledgerResult{white-space:pre-line;line-height:1.7;font-size:13px;margin-top:12px}.err{color:#ffb6bb}.goodtext{color:#78e7ba}
 .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between}.toolbar button{max-width:118px;margin:0;padding:8px;font-size:12px}
 footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
-</style></head><body><div class="small" style="letter-spacing:2px">TW DAY TRADING · MOBILE V1.4</div><h1>台股當沖決策中心</h1>
-<div class="status" id="connection">正在查詢行情狀態…</div>
+</style></head><body><div class="small" style="letter-spacing:2px">TW DAY TRADING · MOBILE V1.5</div><h1>台股當沖決策中心</h1>
+<div class="status" id="connection">正在查詢行情狀態…</div><section class="card"><h2>AI 首席操盤手｜決策規則 V1.0</h2><div class="small">規則式輔助判斷，不是保證獲利的 AI 預測模型。先看資料新鮮度、價量與市場狀態，再以費稅、滑價和單日風險決定是否可試單。</div><div class="grid" style="margin-top:12px"><div><span class="pill good">A 可試單</span><div class="small" style="margin-top:5px">條件通過，仍需人工確認</div></div><div><span class="pill">B 觀察</span><div class="small" style="margin-top:5px">等待量價確認</div></div><div><span class="pill">C 不追價</span><div class="small" style="margin-top:5px">乖離／風險報酬不佳</div></div><div><span class="pill bad">D 取消交易</span><div class="small" style="margin-top:5px">破位或風險超額</div></div></div><div style="margin-top:10px"><span class="pill">E 資料不足</span> <span class="small">行情延遲、休市或權限未驗證，不產生買入訊號</span></div><div id="policyInfo" class="small" style="margin-top:12px"></div></section>
 <section class="card"><h2>交易風險</h2><div class="statrow"><div class="stat"><div class="small">本金上限</div><strong>80 萬</strong></div><div class="stat"><div class="small">當日虧損上限</div><strong>1 萬</strong></div><div class="stat"><div class="small">單筆張數上限</div><strong>2 張</strong></div></div><div id="daily" class="small" style="margin-top:12px">讀取交易紀錄中…</div></section>
 <section class="card"><div class="toolbar"><h2>即時優先監控：京元電／信昌電／國巨</h2><button class="outline" id="refresh">立即更新</button></div><div class="small" id="dataInfo"></div><div class="small" style="margin-top:6px;color:#e9c07b">其他觀察股仍保留在清單，但免費方案不會提供它們的即時報價或買點訊號。</div><div id="watch">載入中…</div></section>
 <section class="card"><h2>TWSE 公開盤後參考</h2><div class="small" id="twseStatus">載入中…</div><div id="twseReference"></div></section><section class="card"><h2>資金輪動比較（樣本有限）</h2><div class="small">僅比較3檔核心監控股；每一族群只涵蓋1至2檔，不能視為整個產業的資金流向。</div><div id="sectors" style="margin-top:12px">尚無即時資料</div></section>
@@ -28,18 +28,21 @@ async function reload(){
  try{
  const resp=await fetch("/api/status",{cache:"no-store"});if(!resp.ok)throw Error("HTTP "+resp.status);
  const data=await resp.json(),online=data.market_data==="CONNECTED";
+ const policy=data.policy||{};
+ stext("policyInfo","策略版本："+(policy.version||"—")+"｜自動下單："+(policy.auto_order?"啟用（應禁止）":"永久關閉，僅輔助決策")+"｜每日損失預算不是券商硬停損");
  $("connection").className="status"+(online?" ready":"");
  $("connection").textContent=online?"行情已連接："+data.provider:"行情尚未連線："+data.market_message+"。不發出可執行買進訊號。";
  stext("dataInfo","供應商："+data.provider+"｜"+data.provider_vwap_type+"｜檢查時間："+new Date(data.now).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}));
  $("watch").innerHTML=data.symbols.map(v=>{
- const cls=v.status==="候選訊號"?"good":v.status==="轉弱警戒"?"bad":"";
+ const cls=v.status==="候選訊號"?"good":v.status==="取消交易"?"bad":"";
  const price=v.price!=null?f(v.price)+" 元":"—";
  const avg=v.average_price!=null?"成交均價 "+f(v.average_price):"無有效均價";
  const time=v.timestamp?"｜"+v.timestamp:"";
- return '<div class="stock"><div class="flex"><div><b>'+v.name+'</b> <span class="small">'+v.symbol+' · '+v.sector+'</span></div><span class="pill '+cls+'">'+v.status+'</span></div><div class="flex" style="margin-top:5px"><div><span class="value">'+price+'</span><span class="small"> '+(v.change_rate!=null?v.change_rate+"%":"")+'</span></div><span class="small">'+avg+'</span></div><div class="small">'+(v.reason||"尚無資料")+time+'</div></div>';
+ const grade=v.status==="候選訊號"?"A｜可試單（人工確認）":v.status==="取消交易"?"D｜取消交易":v.status==="不追價"?"C｜不追價":v.status==="觀察"?"B｜觀察":"E｜資料不足";
+ return '<div class="stock"><div class="flex"><div><b>'+v.name+'</b> <span class="small">'+v.symbol+' · '+v.sector+'</span></div><span class="pill '+cls+'">'+grade+'</span></div><div class="flex" style="margin-top:5px"><div><span class="value">'+price+'</span><span class="small"> '+(v.change_rate!=null?v.change_rate+"%":"")+'</span></div><span class="small">'+avg+'</span></div><div class="small">'+(v.reason||"尚無資料")+time+'</div></div>';
  }).join("");
  $("sectors").innerHTML=data.sectors.length?data.sectors.map(s=>'<div class="flex" style="padding:9px 0;border-bottom:1px solid #34455f"><b>'+s.sector+'</b><span class="'+(s.average_change_rate>=0?"positive":"negative")+'">'+s.average_change_rate+'% <span class="small">('+s.stocks+'/'+s.coverage+'檔)</span></span></div>').join(""):"板塊行情未連線，暫無輪動排序。";
- $("alerts").innerHTML=data.alerts.length?data.alerts.map(a=>'<div class="stock"><b>'+a.state+' · '+a.symbol+'</b><div class="small">'+a.time+'｜'+(a.sent?"已傳送 Telegram":"未傳送至 Telegram")+'</div><div class="small">'+a.message.replaceAll("\n"," · ")+'</div></div>').join(""):"目前沒有符合條件的候選訊號。";
+ $("alerts").innerHTML=data.alerts.length?data.alerts.map(a=>'<div class="stock"><b>'+a.state+' · '+a.symbol+'</b><div class="small">'+a.time+'｜'+(a.push&&a.push.sent?"已推送到裝置服務":"未確認網頁推播")+'</div><div class="small">'+a.message.replaceAll("\n"," · ")+'</div></div>').join(""):"目前沒有符合條件的候選訊號。";
  stext("notifyState",data.webpush_configured?"已啟用網頁推播服務；訊號發送仍取決於行情資料、主機運作及裝置訂閱狀態。":"網頁推播尚未設定完整。");
  const pr=data.public_reference||{};stext("twseStatus","來源：TWSE STOCK_DAY_ALL（上市個股日資料；僅盤後使用）｜最近更新："+(pr.as_of||"未更新")+"｜"+(pr.error||"已取得盤後參考"));
  $("twseReference").innerHTML=Object.entries(pr.symbols||{}).map(([symbol,row])=>`<div class="flex small" style="padding:6px 0"><span>${symbol}（${row.date||"日期依來源"}）</span><span>收盤 ${row.closing_price||"—"}</span></div>`).join("");
