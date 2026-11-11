@@ -74,4 +74,4 @@ def risk(r:RiskRequest):
 
 @app.get("/",response_class=HTMLResponse)
 def home():
- return (ROOT/"index.html").read_text(encoding="utf-8")
+ return (ROOT/"daytrade-dashboard.html").read_text(encoding="utf-8")
