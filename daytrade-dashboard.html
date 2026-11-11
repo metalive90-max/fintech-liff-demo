@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0c1422"><meta name="apple-mobile-web-app-capable" content="yes"><title>台股 AI 當沖決策中心</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0c1422"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/push-icon.svg"><title>台股 AI 當沖決策中心</title><style>
 :root{color-scheme:dark;--surface:#172236;--stroke:#314159;--soft:#9caec5;--green:#5cdbb5;--amber:#ffd48b;--red:#ff9098}*{box-sizing:border-box}
 body{background:#0b1422;color:#f1f5fc;font:15px -apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;max-width:800px;padding:calc(18px + env(safe-area-inset-top)) 14px calc(70px + env(safe-area-inset-bottom));margin:auto}h1{font-size:24px;margin:2px 0 10px}h2{font-size:16px;margin:0 0 12px}.small{font-size:12px;color:var(--soft);line-height:1.5}
 .card{background:var(--surface);border:1px solid var(--stroke);border-radius:15px;padding:16px;margin:13px 0}.status{border:1px solid #845b31;background:#372a20;border-radius:13px;color:#ffdcaa;padding:13px;line-height:1.7}.status.ready{background:#13382f;border-color:#337d62;color:#80f4cb}
@@ -16,7 +16,7 @@ footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
 <section class="card"><h2>交易風險</h2><div class="statrow"><div class="stat"><div class="small">本金上限</div><strong>80 萬</strong></div><div class="stat"><div class="small">當日虧損上限</div><strong>1 萬</strong></div><div class="stat"><div class="small">單筆張數上限</div><strong>2 張</strong></div></div><div id="daily" class="small" style="margin-top:12px">讀取交易紀錄中…</div></section>
 <section class="card"><div class="toolbar"><h2>觀察股票</h2><button class="outline" id="refresh">立即更新</button></div><div class="small" id="dataInfo"></div><div id="watch">載入中…</div></section>
 <section class="card"><h2>資金輪動比較</h2><div class="small">使用有新鮮行情的板塊成分股平均漲跌幅；樣本不足時不做結論。</div><div id="sectors" style="margin-top:12px">尚無即時資料</div></section>
-<section class="card"><h2>即時候選與警戒通知</h2><div class="small" id="notifyState">檢查推播狀態中…</div><div id="alerts" class="small" style="margin-top:12px">尚無通知。</div><button class="outline" id="notifyTest">測試 Telegram 通知</button><div class="small">需要 Render 設定 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID。網頁關閉後的手機提醒需透過 Telegram；免費主機可能休眠而延遲。</div></section>
+<section class="card"><h2>iPhone 網頁推播</h2><div class="small" id="pushState">檢查裝置支援狀態…</div><button id="pushEnable">啟用網頁推播</button><button class="outline" id="pushDisable">取消這台裝置訂閱</button><button class="outline" id="pushTest">發送測試推播</button><div class="small">iPhone 須先用 Safari 開啟網站，分享 → 加入主畫面，再從主畫面開啟並按「啟用網頁推播」。測試不是交易訊號；資料未連線時不會發送買點候選。</div></section><section class="card"><h2>即時候選與警戒通知</h2><div class="small" id="notifyState">檢查推播狀態中…</div><div id="alerts" class="small" style="margin-top:12px">尚無通知。</div><button class="outline" id="notifyTest">測試 Telegram 通知</button><div class="small">需要 Render 設定 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID。網頁關閉後的手機提醒需透過 Telegram；免費主機可能休眠而延遲。</div></section>
 <section class="card"><h2>手動交易風險計算</h2><div class="grid"><div><label>假設買價</label><input type="number" inputmode="decimal" id="entry" value="228" step=".5"></div><div><label>停損價</label><input type="number" inputmode="decimal" id="stop" value="225" step=".5"></div><div><label>目標賣價</label><input type="number" inputmode="decimal" id="target" value="235" step=".5"></div><div><label>張數</label><input type="number" inputmode="numeric" id="lots" value="1" min="1" max="100"></div></div><label><input type="checkbox" id="overnight">隔日賣出（證交稅較高）</label><button id="calc">計算淨損益與停損風險</button><div id="result"></div></section>
 <section class="card"><h2>當日交易紀錄（手動輸入）</h2><div class="small">系統尚未串接國泰成交紀錄；請自行登錄買賣，風險額度才能參考累計損益。此紀錄不是券商下單。</div>
 <div class="grid"><div><label>股票代號</label><select id="symbol"><option value="2449">2449 京元電</option><option value="6173">6173 信昌電</option><option value="1303">1303 南亞</option><option value="3711">3711 日月光投控</option><option value="2327">2327 國巨</option><option value="3026">3026 禾伸堂</option><option value="8358">8358 金居</option><option value="1802">1802 台玻</option><option value="1815">1815 富喬</option><option value="8039">8039 台虹</option><option value="3037">3037 欣興</option><option value="2368">2368 金像電</option><option value="2492">2492 華新科</option><option value="5340">5340 建榮</option></select></div><div><label>買／賣</label><select id="side"><option value="BUY">買入</option><option value="SELL">賣出</option></select></div><div><label>成交價</label><input type="number" id="tradePrice" step=".1" value="228"></div><div><label>股數（1張=1000股）</label><input type="number" id="shares" step="1000" value="1000"></div></div><label><input type="checkbox" id="tradeOvernight">隔日賣出（若適用）</label><button class="outline" id="saveTrade">只記錄成交，不送出訂單</button><div id="ledgerResult"></div></section>
@@ -57,5 +57,34 @@ $("saveTrade").onclick=async()=>{
  try{const p={symbol:$("symbol").value,side:$("side").value,price:+$("tradePrice").value,shares:+$("shares").value,overnight:$("tradeOvernight").checked};
  const r=await fetch("/api/trades",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});const d=await r.json();if(!r.ok)throw Error(JSON.stringify(d.detail||d));stext("ledgerResult",d.message);reload();}catch(e){stext("ledgerResult","記錄失敗："+e.message)}};
 $("notifyTest").onclick=async()=>{try{const r=await fetch("/api/notifications/test",{method:"POST"});const d=await r.json();alert(d.message)}catch(e){alert("通知測試失敗："+e.message)}};
+
+async function getPushReg(){if(!("serviceWorker"in navigator))throw Error("瀏覽器不支援 Service Worker");return navigator.serviceWorker.register("/sw.js",{scope:"/"});}
+function decodeVapid(base64){const p="=".repeat((4-base64.length%4)%4);const raw=atob((base64+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from([...raw].map(ch=>ch.charCodeAt(0)))}
+function isIOS(){return /iPhone|iPad|iPod/.test(navigator.userAgent);}
+function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;}
+async function pushCheck(){try{
+const config=await (await fetch("/api/push/config",{cache:"no-store"})).json();
+if(!config.configured){stext("pushState","伺服器推播尚未設定。");return;}
+if(isIOS()&&!isStandalone()){stext("pushState","請先用 Safari「分享 → 加入主畫面」，再從主畫面開啟本系統。");return;}
+if(!("PushManager"in window)||!("Notification"in window)){stext("pushState","這個瀏覽器目前不支援 Web Push。");return;}
+const reg=await getPushReg();const sub=await reg.pushManager.getSubscription();
+stext("pushState",sub?"這台裝置已有訂閱（通知權限："+Notification.permission+"）":"尚未訂閱（通知權限："+Notification.permission+"）");
+}catch(e){stext("pushState","網頁推播檢查失敗："+e.message)}}
+$("pushEnable").onclick=async()=>{try{
+if(isIOS()&&!isStandalone())throw Error("請先加入 iPhone 主畫面，再從主畫面開啟。");
+const conf=await (await fetch("/api/push/config",{cache:"no-store"})).json();
+if(!conf.configured)throw Error("伺服器推播功能尚未設定");
+const reg=await getPushReg();
+const permission=await Notification.requestPermission();
+if(permission!=="granted")throw Error("未取得通知權限，請到 iPhone 設定開啟");
+let sub=await reg.pushManager.getSubscription();
+if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeVapid(conf.public_key)});
+const r=await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub.toJSON())});
+if(!r.ok)throw Error("伺服器訂閱失敗："+r.status);
+await pushCheck();alert("已啟用這台手機的網頁推播");}catch(e){stext("pushState","無法啟用："+e.message)}};
+$("pushDisable").onclick=async()=>{try{const reg=await getPushReg(),sub=await reg.pushManager.getSubscription();if(!sub)throw Error("尚未訂閱");await fetch("/api/push/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub.toJSON())});await sub.unsubscribe();await pushCheck();}catch(e){stext("pushState",e.message)}};
+$("pushTest").onclick=async()=>{try{const r=await fetch("/api/push/test",{method:"POST"}),d=await r.json();alert(d.message);}catch(e){alert("測試失敗："+e.message)}};
+pushCheck();
+
 reload();setInterval(reload,30000);
 </script></body></html>
