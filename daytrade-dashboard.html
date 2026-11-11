@@ -1,13 +1,61 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#101725"><title>台股當沖決策中心 V1</title><style>
-*{box-sizing:border-box}body{font:16px -apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;background:#0d1422;color:#e9f1ff;max-width:650px;margin:0 auto;padding:22px 16px}.sub{font-size:12px;color:#9aacbf}.card{background:#172236;border:1px solid #2c3d57;border-radius:16px;padding:17px;margin:14px 0}h1{font-size:24px;margin:5px 0 18px}h2{font-size:17px;margin:0 0 14px}.warn{background:#41301e;color:#ffdd9d;padding:14px;border-radius:12px;font-size:14px;line-height:1.6}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stats div{padding:10px 6px;background:#213149;border-radius:10px}.stats b{font-size:18px;display:block;margin-top:8px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #304058;padding:11px 0}.tag{font-size:12px;color:#ffd79d}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;color:#b3bfd1;font-size:13px;margin:8px 0}input:not([type=checkbox]){width:100%;background:#101a2b;color:white;border:1px solid #49607e;border-radius:9px;padding:10px;font-size:17px}button{background:#3a8df4;color:#fff;border:0;border-radius:10px;padding:14px;font-weight:bold;width:100%;margin-top:14px;font-size:16px}#result{white-space:pre-line;line-height:1.8;margin-top:12px;font-size:14px}footer{font-size:12px;line-height:1.7;color:#a0acc0;padding:10px 0 40px}</style></head><body>
-<div class="sub">TW DAY TRADING • V1 • 無自動下單</div><h1>台股 AI 當沖決策中心</h1>
-<div class="warn"><b>⚠️ 未接入正式行情</b><div>目前不會提供買進訊號。畫面僅供手動風險試算；取得合法即時資料後才能啟用監控。</div></div>
-<section class="card"><h2>風險上限</h2><div class="stats"><div><span class="sub">交易額度</span><b>80 萬</b></div><div><span class="sub">虧損上限</span><b>1 萬</b></div><div><span class="sub">單筆最多</span><b>2 張</b></div></div><p class="sub">尚未連接國泰成交紀錄，不能累計整日已實現損益。</p></section>
-<section class="card"><h2>監控清單 <span class="tag">資料未連線</span></h2><div id="watch">讀取中…</div><p id="time" class="sub"></p></section>
-<section class="card"><h2>停損停利試算</h2><div class="fields"><div><label>買入價</label><input id="entry" type="number" value="228" step="0.5"></div><div><label>停損價</label><input id="stop" type="number" value="225" step="0.5"></div><div><label>停利價</label><input id="target" type="number" value="235" step="0.5"></div><div><label>張數</label><input id="lots" type="number" value="1" min="1" max="10"></div></div><label><input id="overnight" type="checkbox"> 隔日賣出（一般證交稅）</label><button id="calc">計算風險</button><div id="result"></div></section>
-<footer>報價狀態：尚未授權／未連線。沒有任何國泰證券交易或下單權限。計算已納入估計交易費、稅與滑價緩衝，但停損成交價無法保證；隔夜跳空可能造成更大的損失。</footer>
+<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0c1422"><meta name="apple-mobile-web-app-capable" content="yes"><title>台股 AI 當沖決策中心</title><style>
+:root{color-scheme:dark;--surface:#172236;--stroke:#314159;--soft:#9caec5;--green:#5cdbb5;--amber:#ffd48b;--red:#ff9098}*{box-sizing:border-box}
+body{background:#0b1422;color:#f1f5fc;font:15px -apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;max-width:800px;padding:calc(18px + env(safe-area-inset-top)) 14px calc(70px + env(safe-area-inset-bottom));margin:auto}h1{font-size:24px;margin:2px 0 10px}h2{font-size:16px;margin:0 0 12px}.small{font-size:12px;color:var(--soft);line-height:1.5}
+.card{background:var(--surface);border:1px solid var(--stroke);border-radius:15px;padding:16px;margin:13px 0}.status{border:1px solid #845b31;background:#372a20;border-radius:13px;color:#ffdcaa;padding:13px;line-height:1.7}.status.ready{background:#13382f;border-color:#337d62;color:#80f4cb}
+.statrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.stat{background:#24344d;border-radius:11px;padding:9px;min-height:70px}.stat strong{font-size:19px;display:block;margin-top:8px;white-space:nowrap}
+.stock{border-bottom:1px solid #30415b;padding:13px 0}.stock:last-child{border:0}.flex{display:flex;justify-content:space-between;align-items:center;gap:10px}.right{text-align:right}.pill{font-size:11px;border-radius:20px;background:#35465c;color:#bbcee7;padding:4px 8px;white-space:nowrap}.pill.good{background:#144637;color:#85f8cc}.pill.bad{background:#57323d;color:#ffc1c8}
+.value{font-weight:750;font-size:18px}.positive{color:var(--green)}.negative{color:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;color:var(--soft);font-size:12px;margin:8px 0 5px}
+input,select{width:100%;min-height:43px;background:#0d1929;color:#f5f9ff;border:1px solid #4e6180;border-radius:9px;padding:8px;font-size:16px}
+input[type=checkbox]{width:auto;min-height:0;margin-right:8px}button{background:#3a8de6;color:#fff;border:0;font-size:15px;font-weight:700;border-radius:10px;padding:12px;width:100%;margin-top:12px}button:active{opacity:.78}.outline{background:transparent;border:1px solid #577fae;color:#b3d4ff}
+#result,#ledgerResult{white-space:pre-line;line-height:1.7;font-size:13px;margin-top:12px}.err{color:#ffb6bb}.goodtext{color:#78e7ba}
+.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between}.toolbar button{max-width:118px;margin:0;padding:8px;font-size:12px}
+footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
+</style></head><body><div class="small" style="letter-spacing:2px">TW DAY TRADING · MOBILE V1.2</div><h1>台股當沖決策中心</h1>
+<div class="status" id="connection">正在查詢行情狀態…</div>
+<section class="card"><h2>交易風險</h2><div class="statrow"><div class="stat"><div class="small">本金上限</div><strong>80 萬</strong></div><div class="stat"><div class="small">當日虧損上限</div><strong>1 萬</strong></div><div class="stat"><div class="small">單筆張數上限</div><strong>2 張</strong></div></div><div id="daily" class="small" style="margin-top:12px">讀取交易紀錄中…</div></section>
+<section class="card"><div class="toolbar"><h2>觀察股票</h2><button class="outline" id="refresh">立即更新</button></div><div class="small" id="dataInfo"></div><div id="watch">載入中…</div></section>
+<section class="card"><h2>資金輪動比較</h2><div class="small">使用有新鮮行情的板塊成分股平均漲跌幅；樣本不足時不做結論。</div><div id="sectors" style="margin-top:12px">尚無即時資料</div></section>
+<section class="card"><h2>即時候選與警戒通知</h2><div class="small" id="notifyState">檢查推播狀態中…</div><div id="alerts" class="small" style="margin-top:12px">尚無通知。</div><button class="outline" id="notifyTest">測試 Telegram 通知</button><div class="small">需要 Render 設定 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID。網頁關閉後的手機提醒需透過 Telegram；免費主機可能休眠而延遲。</div></section>
+<section class="card"><h2>手動交易風險計算</h2><div class="grid"><div><label>假設買價</label><input type="number" inputmode="decimal" id="entry" value="228" step=".5"></div><div><label>停損價</label><input type="number" inputmode="decimal" id="stop" value="225" step=".5"></div><div><label>目標賣價</label><input type="number" inputmode="decimal" id="target" value="235" step=".5"></div><div><label>張數</label><input type="number" inputmode="numeric" id="lots" value="1" min="1" max="100"></div></div><label><input type="checkbox" id="overnight">隔日賣出（證交稅較高）</label><button id="calc">計算淨損益與停損風險</button><div id="result"></div></section>
+<section class="card"><h2>當日交易紀錄（手動輸入）</h2><div class="small">系統尚未串接國泰成交紀錄；請自行登錄買賣，風險額度才能參考累計損益。此紀錄不是券商下單。</div>
+<div class="grid"><div><label>股票代號</label><select id="symbol"><option value="2449">2449 京元電</option><option value="6173">6173 信昌電</option><option value="1303">1303 南亞</option><option value="3711">3711 日月光投控</option><option value="2327">2327 國巨</option><option value="3026">3026 禾伸堂</option><option value="8358">8358 金居</option><option value="1802">1802 台玻</option><option value="1815">1815 富喬</option><option value="8039">8039 台虹</option><option value="3037">3037 欣興</option><option value="2368">2368 金像電</option><option value="2492">2492 華新科</option><option value="5340">5340 建榮</option></select></div><div><label>買／賣</label><select id="side"><option value="BUY">買入</option><option value="SELL">賣出</option></select></div><div><label>成交價</label><input type="number" id="tradePrice" step=".1" value="228"></div><div><label>股數（1張=1000股）</label><input type="number" id="shares" step="1000" value="1000"></div></div><label><input type="checkbox" id="tradeOvernight">隔日賣出（若適用）</label><button class="outline" id="saveTrade">只記錄成交，不送出訂單</button><div id="ledgerResult"></div></section>
+<footer>此網站只供研究及交易決策輔助，**沒有券商下單程式或交易授權**。成交量與平均價為 FinMind 快照資料，不等於完整逐筆 VWAP；未授權、逾時、休市或缺少 K 線時不得視作確定買點。停損、費用、滑價和隔夜跳空會讓實際損失超出試算。免費服務及暫存資料庫可能在重啟後遺失交易紀錄；不應作為唯一的風控依據。</footer>
 <script>
-const $=id=>document.getElementById(id), money=n=>Number(n).toLocaleString("zh-TW",{maximumFractionDigits:0});
-async function poll(){try{const r=await fetch("/api/status",{cache:"no-store"}),s=await r.json();if(!r.ok)throw Error("status "+r.status);$("watch").innerHTML=s.symbols.map(x=>'<div class="row"><span>'+x.name+' <small class="sub">'+x.symbol+'</small></span><span class="tag">'+x.status+'</span></div>').join("");$("time").textContent="更新："+new Date(s.now).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"});}catch(e){$("watch").textContent="讀取失敗："+e.message}}
-$("calc").onclick=async()=>{let x={entry:Number($("entry").value),stop:Number($("stop").value),target:Number($("target").value),lots:Number($("lots").value),overnight:$("overnight").checked};try{let r=await fetch("/api/risk",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(x)}),d=await r.json();if(!r.ok)throw Error("輸入無效");$("result").textContent=d.message+"\n投入資金：NT$ "+money(d.capital)+"\n含滑價預估風險：NT$ "+money(d.risk_including_buffer)+"\n目標估算淨利：NT$ "+money(d.profit_target_estimate)+"\n報酬風險比："+d.risk_reward;}catch(e){$("result").textContent=e.message}};poll();setInterval(poll,60000);
+const $=id=>document.getElementById(id),f=n=>Number(n).toLocaleString("zh-TW",{maximumFractionDigits:2});
+function stext(id,text){$(id).textContent=text}
+async function reload(){
+ try{
+ const resp=await fetch("/api/status",{cache:"no-store"});if(!resp.ok)throw Error("HTTP "+resp.status);
+ const data=await resp.json(),online=data.market_data==="CONNECTED";
+ $("connection").className="status"+(online?" ready":"");
+ $("connection").textContent=online?"行情已連接："+data.provider:"行情尚未連線："+data.market_message+"。不發出可執行買進訊號。";
+ stext("dataInfo","供應商："+data.provider+"｜"+data.provider_vwap_type+"｜檢查時間："+new Date(data.now).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}));
+ $("watch").innerHTML=data.symbols.map(v=>{
+ const cls=v.status==="候選訊號"?"good":v.status==="轉弱警戒"?"bad":"";
+ const price=v.price!=null?f(v.price)+" 元":"—";
+ const avg=v.average_price!=null?"成交均價 "+f(v.average_price):"無有效均價";
+ const time=v.timestamp?"｜"+v.timestamp:"";
+ return '<div class="stock"><div class="flex"><div><b>'+v.name+'</b> <span class="small">'+v.symbol+' · '+v.sector+'</span></div><span class="pill '+cls+'">'+v.status+'</span></div><div class="flex" style="margin-top:5px"><div><span class="value">'+price+'</span><span class="small"> '+(v.change_rate!=null?v.change_rate+"%":"")+'</span></div><span class="small">'+avg+'</span></div><div class="small">'+(v.reason||"尚無資料")+time+'</div></div>';
+ }).join("");
+ $("sectors").innerHTML=data.sectors.length?data.sectors.map(s=>'<div class="flex" style="padding:9px 0;border-bottom:1px solid #34455f"><b>'+s.sector+'</b><span class="'+(s.average_change_rate>=0?"positive":"negative")+'">'+s.average_change_rate+'% <span class="small">('+s.stocks+'/'+s.coverage+'檔)</span></span></div>').join(""):"板塊行情未連線，暫無輪動排序。";
+ $("alerts").innerHTML=data.alerts.length?data.alerts.map(a=>'<div class="stock"><b>'+a.state+' · '+a.symbol+'</b><div class="small">'+a.time+'｜'+(a.sent?"已傳送 Telegram":"未傳送至 Telegram")+'</div><div class="small">'+a.message.replaceAll("\n"," · ")+'</div></div>').join(""):"目前沒有符合條件的候選訊號。";
+ stext("notifyState",data.telegram_configured?"Telegram 已設定，可執行測試通知":"尚未設定 Telegram；系統不會傳送手機背景通知");
+ const l=data.ledger;
+ stext("daily","手動登錄的估算淨損益："+f(l.realized_net_estimate)+" 元｜剩餘可承受風險："+f(l.risk_budget_remaining)+" 元｜未平倉股數："+JSON.stringify(l.open_shares)+"｜紀錄："+l.orders_logged+" 筆"+(!data.persistence?"｜資料為非持久性儲存，重啟可能遺失":""));
+ }catch(e){stext("connection","伺服器連線異常："+e.message);$("connection").className="status"}
+}
+$("refresh").onclick=reload;
+$("calc").onclick=async()=>{
+ try{const p={entry:+$("entry").value,stop:+$("stop").value,target:+$("target").value,lots:+$("lots").value,overnight:$("overnight").checked};
+ const r=await fetch("/api/risk",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});let d=await r.json();if(!r.ok)throw Error("請檢查輸入");
+ stext("result",d.message+"\n資金："+f(d.capital)+" 元\n含費稅與滑價緩衝的停損風險："+f(d.risk_including_buffer)+" 元\n目標淨利："+f(d.profit_target_estimate)+" 元\n報酬風險比："+d.risk_reward);
+ $("result").className=d.passes?"goodtext":"err";
+ }catch(e){stext("result",e.message)}};
+$("saveTrade").onclick=async()=>{
+ if(!confirm("確定這筆交易已在國泰券商成交？這裡只做記錄，並不送單。"))return;
+ try{const p={symbol:$("symbol").value,side:$("side").value,price:+$("tradePrice").value,shares:+$("shares").value,overnight:$("tradeOvernight").checked};
+ const r=await fetch("/api/trades",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});const d=await r.json();if(!r.ok)throw Error(JSON.stringify(d.detail||d));stext("ledgerResult",d.message);reload();}catch(e){stext("ledgerResult","記錄失敗："+e.message)}};
+$("notifyTest").onclick=async()=>{try{const r=await fetch("/api/notifications/test",{method:"POST"});const d=await r.json();alert(d.message)}catch(e){alert("通知測試失敗："+e.message)}};
+reload();setInterval(reload,30000);
 </script></body></html>
