@@ -19,14 +19,14 @@ TZ=ZoneInfo("Asia/Taipei")
 ROOT=Path(__file__).parent
 USERNAME=os.environ.get("APP_USERNAME","trader")
 PASSWORD=os.environ.get("APP_PASSWORD","")
-FINMIND_TOKEN=os.environ.get("FINMIND_TOKEN","").strip()
+FUGLE_API_KEY=os.environ.get("FUGLE_API_KEY","").strip()
 TG_TOKEN=os.environ.get("TELEGRAM_BOT_TOKEN","").strip()
 TG_CHAT=os.environ.get("TELEGRAM_CHAT_ID","").strip()
 DB_PATH=os.environ.get("DB_PATH","/tmp/daytrade-v12.sqlite3")
 VAPID_PRIVATE_B64=os.environ.get("VAPID_PRIVATE_KEY_B64","").strip()
 VAPID_PUBLIC=os.environ.get("VAPID_PUBLIC_KEY","").strip()
 VAPID_SUBJECT=os.environ.get("VAPID_SUBJECT","https://tw-daytrade-mobile-2026.onrender.com")
-POLL_SECONDS=max(20,int(os.environ.get("POLL_SECONDS","45")))
+POLL_SECONDS=max(30,int(os.environ.get("POLL_SECONDS","30")))
 MAX_AGE=90
 CAPITAL=800000
 DAILY_LOSS=10000
@@ -46,7 +46,12 @@ cache={"quotes":{},"last_fetch":None,"error":"尚未啟用即時行情","last_al
 history=defaultdict(lambda:deque(maxlen=240))
 sent_alerts={}
 task=None
-DATA_URL="https://api.finmindtrade.com/api/v4/taiwan_stock_tick_snapshot"
+FUGLE_URL="https://api.fugle.tw/marketdata/v1.0/stock/"
+CORE_SYMBOLS=("2449","6173","2327")
+TWSE_URL="https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+public_state={"last_checked":None,"as_of":None,"error":"尚未取得 TWSE 公開資料","references":{}}
+last_candles={}
+last_candle_refresh=0
 def now():return datetime.now(TZ)
 def money(v):return round(float(v),2)
 def local_date():return now().date().isoformat()
@@ -140,6 +145,7 @@ def signal(q):
  if not market_open():return "非交易時段","盤後行情僅供參考",None
  if not all(v and v>0 for v in (close,avg,high,lo)):return "觀察","價格資料不完整",None
  if not h or len(h)<4:return "觀察","累積有效快照不足，無法判斷動能",None
+ if not q.get("five_min_confirmed") or (q.get("candle_count") or 0)<5:return "觀察","尚未有完整5分鐘K線價量確認",None
  earlier=h[-4][1]
  # Not a guaranteed fill or technical 5-minute bar; only snapshot based heuristic.
  momentum=(close-earlier)/earlier if earlier else 0
@@ -152,20 +158,108 @@ def signal(q):
   if rv["passes"] and rv["risk_reward"]>=1.5:
    return "候選訊號","價量快照轉強；尚須人工確認盤中K線、當沖資格及委託風險",{"entry":round(close,2),"stop":round(stop,2),"target":round(target,2),"lots":1,"risk":rv["risk_including_buffer"]}
  return "觀察","尚未符合價量快照條件",None
-def fetch_snapshot_sync():
- if not FINMIND_TOKEN:return [],"尚未設定 FinMind Sponsor Token"
- q=urlencode({"data_id":list(WATCH.keys())+["001"]},doseq=True)
- req=URLRequest(DATA_URL+"?"+q,headers={"Authorization":"Bearer "+FINMIND_TOKEN,"User-Agent":"TWDaytradeV1/1.2"})
+def timestamp_to_local(ts):
  try:
-  with urlopen(req,timeout=15) as rsp:
-   data=json.loads(rsp.read(1024*1024).decode())
-  if not isinstance(data,dict) or not isinstance(data.get("data"),list):
-   return [],"FinMind 回應格式不符或授權不足"
-  records=data["data"]
-  if not records:return [],"行情回傳空白，請檢查 Sponsor 權限"
-  return records,None
- except Exception as e:
-  return [],"無法取得行情："+type(e).__name__
+  if not isinstance(ts,(int,float)) or ts<=0:return None
+  scale=1000000 if ts>1e14 else 1000 if ts>1e11 else 1
+  return datetime.fromtimestamp(ts/scale,TZ)
+ except (OSError,OverflowError,ValueError):return None
+
+def fugle_get(path):
+ req=URLRequest(FUGLE_URL+path,headers={"X-API-KEY":FUGLE_API_KEY,"Accept":"application/json","User-Agent":"TWDaytradePrivate/1.3"})
+ with urlopen(req,timeout=9) as res:
+  data=json.loads(res.read(600000).decode("utf-8"))
+ if not isinstance(data,dict):raise ValueError("Unexpected Fugle response")
+ return data
+
+def fetch_snapshot_sync():
+ """Free Fugle per-symbol REST calls, no premium /snapshot endpoint."""
+ if not FUGLE_API_KEY:return [],"尚未設定 Fugle API Key（FUGLE_API_KEY）"
+ global last_candle_refresh
+ records=[];errors=[]
+ need_candles=(time.monotonic()-last_candle_refresh>100)
+ for sid in CORE_SYMBOLS:
+  try:
+   src=fugle_get("intraday/quote/"+sid)
+   if src.get("symbol")!=sid or src.get("isTrial") or src.get("tradingHalt",{}).get("isHalted"):
+    errors.append(sid+" 資料不適用");continue
+   stamp=timestamp_to_local(src.get("closeTime") or src.get("lastTrade",{}).get("time"))
+   if stamp is None or src.get("date")!=stamp.date().isoformat():
+    errors.append(sid+" 成交時間無效");continue
+   avg=src.get("avgPrice")
+   price=src.get("closePrice")
+   total=src.get("total") or {}
+   if not isinstance(price,(int,float)) or not isinstance(avg,(int,float)) or price<=0 or avg<=0:
+    errors.append(sid+" 價格不完整");continue
+   previous=src.get("previousClose")
+   change=(float(price)/float(previous)-1)*100 if isinstance(previous,(int,float)) and previous>0 else None
+   vratio=None
+   candle_count=0
+   confirm=False
+   if need_candles:
+    try:
+     cs=fugle_get("intraday/candles/"+sid+"?timeframe=5")
+     bars=[]
+     for bar in cs.get("data",[]):
+      dt=parse_time(bar.get("date"))
+      if dt and dt.date()==now().date() and dt+timedelta(minutes=5)<=now()-timedelta(seconds=15):
+       bars.append((dt,bar))
+     bars.sort(key=lambda row:row[0])
+     last_candles[sid]=bars[-8:]
+    except Exception as exc:
+     errors.append(sid+" K線暫時不可用 ("+type(exc).__name__+")")
+   bars=last_candles.get(sid,[])
+   if len(bars)>=5:
+    last=bars[-1][1]
+    volumes=[float(x[1].get("volume") or 0) for x in bars[-5:-1]]
+    median=sorted(volumes)[len(volumes)//2]
+    current=float(last.get("volume") or 0)
+    vratio=round(current/median,2) if median>0 else None
+    candle_count=len(bars)
+    confirm=(float(last.get("close") or 0)>float(bars[-2][1].get("close") or 0) and
+             float(last.get("close") or 0)>avg and vratio is not None and vratio>=1.2)
+   records.append({
+     "stock_id":sid,"date":stamp.isoformat(),"close":price,"average_price":avg,
+     "high":src.get("highPrice"),"low":src.get("lowPrice"),"change_rate":change,
+     "total_volume":total.get("tradeVolume"),"volume_ratio":vratio,"candle_count":candle_count,
+     "five_min_confirmed":confirm,"isTrial":False,
+     "provider":"Fugle free REST","close_time":src.get("closeTime")
+   })
+  except Exception as exc:
+   errors.append(sid+" 行情請求失敗 ("+type(exc).__name__+")")
+ if need_candles:last_candle_refresh=time.monotonic()
+ return records,"；".join(errors) if errors and not records else None
+
+def twse_fetch_sync():
+ """TWSE public daily closing data: reference only, never part of live signals."""
+ req=URLRequest(TWSE_URL,headers={"Accept":"application/json","User-Agent":"TWDaytradePrivate/1.3"})
+ with urlopen(req,timeout=12) as res:
+  rows=json.loads(res.read(4500000).decode("utf-8"))
+ if not isinstance(rows,list):raise ValueError("Unexpected TWSE response")
+ refs={}
+ for row in rows:
+  if not isinstance(row,dict):continue
+  sid=str(row.get("Code") or row.get("code") or "")
+  if sid in CORE_SYMBOLS:
+   refs[sid]={"date":str(row.get("Date","")),"closing_price":row.get("ClosingPrice"),
+     "trade_volume":row.get("TradeVolume"),"source":"TWSE STOCK_DAY_ALL 盤後"}
+ return refs
+
+async def refresh_twse_if_due():
+ n=now()
+ checked=public_state["last_checked"]
+ if checked and checked.date()==n.date():return
+ if n.time()<dtime(15,0):return
+ public_state["last_checked"]=n
+ try:
+  refs=await asyncio.to_thread(twse_fetch_sync)
+  if refs:
+   public_state["references"]=refs
+   public_state["as_of"]=n.isoformat()
+   public_state["error"]=None
+  else:public_state["error"]="TWSE 沒有回傳指定個股資訊"
+ except Exception as exc:public_state["error"]="TWSE 公開資料讀取失敗："+type(exc).__name__
+
 def telegram_sync(message):
  if not TG_TOKEN or not TG_CHAT:return False
  payload=json.dumps({"chat_id":TG_CHAT,"text":message,"disable_web_page_preview":True}).encode()
@@ -186,7 +280,9 @@ async def monitor_once():
   t=parse_time(item.get("date"))
   if not t:continue
   prev=cache["quotes"].get(sid)
-  if prev and str(prev.get("date"))==str(item.get("date")):continue
+  if prev and str(prev.get("date"))==str(item.get("date")):
+   cache["quotes"][sid]=item
+   continue
   cache["quotes"][sid]=item
   close=num(item,"close")
   if close and fresh(item):history[sid].append((t,close))
@@ -208,7 +304,8 @@ async def monitor_once():
 async def worker():
  while True:
   try:
-   if FINMIND_TOKEN and market_open():await monitor_once()
+   if FUGLE_API_KEY and market_open():await monitor_once()
+   await refresh_twse_if_due()
   except Exception:log.exception("Monitoring error")
   await asyncio.sleep(POLL_SECONDS)
 @asynccontextmanager
@@ -236,7 +333,7 @@ async def auth(request:Request,call_next):
  rsp.headers["X-Content-Type-Options"]="nosniff"
  return rsp
 @app.get("/health")
-def health():return {"ok":True,"auto_order":False,"market_data_connected":bool(FINMIND_TOKEN and cache["quotes"])}
+def health():return {"ok":True,"auto_order":False,"market_data_connected":bool(FUGLE_API_KEY and market_quotes())}
 @app.get("/",response_class=HTMLResponse)
 def home():return (ROOT/"daytrade-dashboard.html").read_text(encoding="utf-8")
 @app.get("/api/status")
@@ -250,11 +347,11 @@ def status():
    continue
   label,reason,setup=signal(q)
   entries.append({"symbol":sid,"name":name,"sector":sec,"price":num(q,"close"),"average_price":num(q,"average_price"),"high":num(q,"high"),"low":num(q,"low"),"change_rate":num(q,"change_rate"),"total_volume":num(q,"total_volume"),"volume_ratio":num(q,"volume_ratio"),"timestamp":q.get("date"),"fresh":fresh(q),"status":label,"reason":reason,"setup":setup})
- return {"now":now().isoformat(),"market_data":"CONNECTED" if FINMIND_TOKEN and market_quotes() else "DISCONNECTED",
- "provider":"FinMind Sponsor snapshot" if FINMIND_TOKEN else "未設定行情授權",
- "provider_vwap_type":"供應商 average_price（非完整逐筆 VWAP）",
+ return {"now":now().isoformat(),"market_data":"CONNECTED" if FUGLE_API_KEY and market_quotes() else "DISCONNECTED",
+ "provider":"Fugle 免費個股 REST（3檔）" if FUGLE_API_KEY else "未設定 Fugle API Key",
+ "provider_vwap_type":"Fugle avgPrice 當日成交均價（非自行重建逐筆 VWAP）",
  "market_message":cache["error"] or ("盤中行情已連線" if market_quotes() else "尚無當日新鮮快照；禁止買進提示"),
- "last_fetch":cache["last_fetch"],"auto_order":False,"capital_limit":CAPITAL,"daily_loss_limit":DAILY_LOSS,"max_lots":MAX_LOTS,
+ "last_fetch":cache["last_fetch"],"public_reference":{"source":"TWSE STOCK_DAY_ALL 盤後","as_of":public_state["as_of"],"error":public_state["error"],"symbols":public_state["references"]},"auto_order":False,"capital_limit":CAPITAL,"daily_loss_limit":DAILY_LOSS,"max_lots":MAX_LOTS,
  "telegram_configured":bool(TG_TOKEN and TG_CHAT),"webpush_configured":bool(VAPID_PRIVATE_B64 and VAPID_PUBLIC),"persistence":book["persistent"],
  "ledger":{k:v for k,v in book.items() if k!="trades"},"sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10]}
 class RiskRequest(BaseModel):
