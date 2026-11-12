@@ -238,7 +238,7 @@ def fetch_snapshot_sync():
     except Exception as exc:
      errors.append(sid+" K線暫時不可用 ("+type(exc).__name__+")")
    bars=last_candles.get(sid,[])
-   if len(bars)>=5:
+   if len(bars)>=5 and bars[-1][0].date()==now().date() and timedelta(0)<=now()-bars[-1][0]<=timedelta(minutes=12):
     last=bars[-1][1]
     volumes=[float(x[1].get("volume") or 0) for x in bars[-5:-1]]
     median=sorted(volumes)[len(volumes)//2]
@@ -313,7 +313,8 @@ async def monitor_once():
   close=num(item,"close")
   if close and fresh(item):history[sid].append((t,close))
   state,reason,setup=signal(item)
-  if state in ("候選訊號","取消交易") and market_open() and fresh(item):
+  # A risk rejection is not a verified major technical breakdown: do not send false cancellation alerts.
+  if state=="候選訊號" and setup and market_open() and fresh(item):
    key=f"{local_date()}:{sid}:{state}"
    prev_alert=sent_alerts.get(key,0)
    if time.time()-prev_alert>1800:
@@ -372,17 +373,20 @@ def status():
   name,sec=WATCH.get(sid,(sid,"自選"))
   q=cache["quotes"].get(sid)
   if not q:
-   entries.append({"symbol":sid,"name":name,"sector":sec,"status":"資料未連線","price":None,"average_price":None,"timestamp":None})
+   entries.append({"symbol":sid,"name":name,"sector":sec,"status":"資料未連線","price":None,"average_price":None,"timestamp":None,"fresh":False,"source_age_seconds":None,"monitoring":True})
    continue
   label,reason,setup=signal(q)
-  entries.append({"symbol":sid,"name":name,"sector":sec,"price":num(q,"close"),"average_price":num(q,"average_price"),"high":num(q,"high"),"low":num(q,"low"),"change_rate":num(q,"change_rate"),"total_volume":num(q,"total_volume"),"volume_ratio":num(q,"volume_ratio"),"timestamp":q.get("date"),"fresh":fresh(q),"status":label,"reason":reason,"setup":setup})
+  source_dt=parse_time(q.get("date"))
+  source_age=round((now()-source_dt).total_seconds()) if source_dt else None
+  entries.append({"symbol":sid,"name":name,"sector":sec,"source_age_seconds":source_age,"monitoring":True,"price":num(q,"close"),"average_price":num(q,"average_price"),"high":num(q,"high"),"low":num(q,"low"),"change_rate":num(q,"change_rate"),"total_volume":num(q,"total_volume"),"volume_ratio":num(q,"volume_ratio"),"timestamp":q.get("date"),"fresh":fresh(q),"status":label,"reason":reason,"setup":setup})
  return {"now":now().isoformat(),"market_data":"CONNECTED" if FUGLE_API_KEY and market_quotes() else "DISCONNECTED",
  "provider":"Fugle 免費個股 REST（自選逐檔查詢）" if FUGLE_API_KEY else "未設定 Fugle API Key",
  "provider_vwap_type":"Fugle avgPrice 當日成交均價（非自行重建逐筆 VWAP）",
+ "data_max_age_seconds":MAX_AGE,
  "market_message":cache["error"] or ("盤中行情已連線" if market_quotes() else "尚無當日新鮮快照；禁止買進提示"),
  "last_fetch":cache["last_fetch"],"public_reference":{"source":"TWSE STOCK_DAY_ALL 盤後","as_of":public_state["as_of"],"error":public_state["error"],"symbols":public_state["references"]},"auto_order":False,"capital_limit":CAPITAL,"daily_loss_limit":DAILY_LOSS,"max_lots":MAX_LOTS,
  "policy":DECISION_POLICY,"telegram_configured":bool(TG_TOKEN and TG_CHAT),"webpush_configured":bool(VAPID_PRIVATE_B64 and VAPID_PUBLIC),"persistence":book["persistent"],
- "ledger":{k:v for k,v in book.items() if k!="trades"},"sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10],"max_watched":MAX_WATCHED,"watchlist":[{"symbol":x,"name":WATCH[x][0],"sector":WATCH[x][1]} for x in active_symbols()]}
+ "ledger":{k:v for k,v in book.items() if k!="trades"},"persistence_warning":None if book["persistent"] else "目前使用暫存資料庫；主機重啟可能使自選清單、訂閱及交易記錄遺失","sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10],"max_watched":MAX_WATCHED,"watchlist":[{"symbol":x,"name":WATCH[x][0],"sector":WATCH[x][1]} for x in active_symbols()]}
 class WatchRequest(BaseModel):
  symbol:str=Field(pattern=r"^[0-9]{4}$")
  name:str=Field(min_length=1,max_length=30)
