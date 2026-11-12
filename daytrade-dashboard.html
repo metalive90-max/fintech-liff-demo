@@ -22,6 +22,33 @@ footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
 <div class="grid"><div><label>股票代號</label><select id="symbol"><option value="2449">2449 京元電</option><option value="6173">6173 信昌電</option><option value="1303">1303 南亞</option><option value="3711">3711 日月光投控</option><option value="2327">2327 國巨</option><option value="3026">3026 禾伸堂</option><option value="8358">8358 金居</option><option value="1802">1802 台玻</option><option value="1815">1815 富喬</option><option value="8039">8039 台虹</option><option value="3037">3037 欣興</option><option value="2368">2368 金像電</option><option value="2492">2492 華新科</option><option value="5340">5340 建榮</option></select></div><div><label>買／賣</label><select id="side"><option value="BUY">買入</option><option value="SELL">賣出</option></select></div><div><label>成交價</label><input type="number" id="tradePrice" step=".1" value="228"></div><div><label>股數（1張=1000股）</label><input type="number" id="shares" step="1000" value="1000"></div></div><label><input type="checkbox" id="tradeOvernight">隔日賣出（若適用）</label><button class="outline" id="saveTrade">只記錄成交，不送出訂單</button><div id="ledgerResult"></div></section>
 <footer>此網站只供研究及交易決策輔助，**沒有券商下單程式或交易授權**。成交量與均價取自 Fugle 個股行情；均價不等於自行重建的逐筆 VWAP；未授權、逾時、休市或缺少 K 線時不得視作確定買點。停損、費用、滑價和隔夜跳空會讓實際損失超出試算。免費服務及暫存資料庫可能在重啟後遺失交易紀錄；不應作為唯一的風控依據。</footer>
 <script>
+// Credentials are kept in page memory only (never localStorage or a URL).
+const backendFetch=window.fetch.bind(window);
+let apiAuth=null;
+let authPromptOpen=false;
+window.fetch=async (resource,options={})=>{
+ const url=typeof resource==="string"?resource:resource.url;
+ if(!url.startsWith("/api/"))return backendFetch(resource,options);
+ const request=async()=>{
+  const headers=new Headers(options.headers||{});
+  if(apiAuth)headers.set("Authorization",apiAuth);
+  return backendFetch(resource,{...options,headers});
+ };
+ let response=await request();
+ if(response.status===401 && !authPromptOpen){
+  authPromptOpen=true;
+  try{
+   const u=prompt("請輸入 Render 台股系統的帳號");
+   if(u===null)return response;
+   const p=prompt("請輸入 Render 台股系統的密碼（僅暫存在此網頁記憶體）");
+   if(p===null)return response;
+   apiAuth="Basic "+btoa(unescape(encodeURIComponent(u+":"+p)));
+   response=await request();
+   if(response.status===401){apiAuth=null;alert("登入失敗，請確認 Render 帳密");}
+  }finally{authPromptOpen=false}
+ }
+ return response;
+};
 const $=id=>document.getElementById(id),f=n=>Number(n).toLocaleString("zh-TW",{maximumFractionDigits:2});
 function stext(id,text){$(id).textContent=text}
 function safe(x){return String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
