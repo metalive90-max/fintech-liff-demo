@@ -14,7 +14,7 @@ footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
 </style></head><body><div class="small" style="letter-spacing:2px">TW DAY TRADING · MOBILE V1.5</div><h1>台股當沖決策中心</h1>
 <div class="status" id="connection">正在查詢行情狀態…</div><section class="card"><h2>AI 首席操盤手｜決策規則 V1.0</h2><div class="small">規則式輔助判斷，不是保證獲利的 AI 預測模型。先看資料新鮮度、價量與市場狀態，再以費稅、滑價和單日風險決定是否可試單。</div><div class="grid" style="margin-top:12px"><div><span class="pill good">A 可試單</span><div class="small" style="margin-top:5px">條件通過，仍需人工確認</div></div><div><span class="pill">B 觀察</span><div class="small" style="margin-top:5px">等待量價確認</div></div><div><span class="pill">C 不追價</span><div class="small" style="margin-top:5px">乖離／風險報酬不佳</div></div><div><span class="pill bad">D 取消交易</span><div class="small" style="margin-top:5px">破位或風險超額</div></div></div><div style="margin-top:10px"><span class="pill">E 資料不足</span> <span class="small">行情延遲、休市或權限未驗證，不產生買入訊號</span></div><div id="policyInfo" class="small" style="margin-top:12px"></div></section>
 <section class="card"><h2>交易風險</h2><div class="statrow"><div class="stat"><div class="small">本金上限</div><strong>80 萬</strong></div><div class="stat"><div class="small">當日虧損上限</div><strong>1 萬</strong></div><div class="stat"><div class="small">單筆張數上限</div><strong>2 張</strong></div></div><div id="daily" class="small" style="margin-top:12px">讀取交易紀錄中…</div></section>
-<section class="card"><div class="toolbar"><h2>即時優先監控：京元電／信昌電／國巨</h2><button class="outline" id="refresh">立即更新</button></div><div class="small" id="dataInfo"></div><div class="small" style="margin-top:6px;color:#e9c07b">其他觀察股仍保留在清單，但免費方案不會提供它們的即時報價或買點訊號。</div><div id="watch">載入中…</div></section>
+<section class="card"><div class="toolbar"><h2>我的自選監控股票</h2><button class="outline" id="refresh">立即更新</button></div><div class="small" id="dataInfo"></div><div class="small" style="margin-top:6px;color:#e9c07b">逐檔獨立查詢。未通過行情時效與K線確認，不會產生買進訊號。</div><div class="grid"><div><label>新增股票代號</label><input id="newSymbol" maxlength="4" inputmode="numeric" placeholder="例如2449"></div><div><label>股票名稱</label><input id="newName" placeholder="例如京元電"></div></div><button id="addSymbol">＋ 新增監控</button><div class="small" id="watchMessage" aria-live="polite"></div><div id="watch">載入中…</div></section>
 <section class="card"><h2>TWSE 公開盤後參考</h2><div class="small" id="twseStatus">載入中…</div><div id="twseReference"></div></section><section class="card"><h2>資金輪動比較（樣本有限）</h2><div class="small">僅比較3檔核心監控股；每一族群只涵蓋1至2檔，不能視為整個產業的資金流向。</div><div id="sectors" style="margin-top:12px">尚無即時資料</div></section>
 <section class="card"><h2>iPhone 網頁推播</h2><div class="small" id="pushState">檢查裝置支援狀態…</div><button id="pushEnable">啟用網頁推播</button><button class="outline" id="pushDisable">取消這台裝置訂閱</button><button class="outline" id="pushTest">發送測試推播</button><div class="small">iPhone 須先用 Safari 開啟網站，分享 → 加入主畫面，再從主畫面開啟並按「啟用網頁推播」。測試不是交易訊號；資料未連線時不會發送買點候選。</div></section><section class="card"><h2>即時候選與警戒通知</h2><div class="small" id="notifyState">檢查推播狀態中…</div><div id="alerts" class="small" style="margin-top:12px">尚無通知。</div><div class="small">啟用 iPhone 網頁推播後，符合條件的訊號將以網頁通知發送；免費主機休眠、行情未連線或訂閱資料遺失時可能無法通知。</div></section>
 <section class="card"><h2>手動交易風險計算</h2><div class="grid"><div><label>假設買價</label><input type="number" inputmode="decimal" id="entry" value="228" step=".5"></div><div><label>停損價</label><input type="number" inputmode="decimal" id="stop" value="225" step=".5"></div><div><label>目標賣價</label><input type="number" inputmode="decimal" id="target" value="235" step=".5"></div><div><label>張數</label><input type="number" inputmode="numeric" id="lots" value="1" min="1" max="100"></div></div><label><input type="checkbox" id="overnight">隔日賣出（證交稅較高）</label><button id="calc">計算淨損益與停損風險</button><div id="result"></div></section>
@@ -24,10 +24,12 @@ footer{font-size:12px;line-height:1.8;color:#98abc4;margin-top:22px}
 <script>
 const $=id=>document.getElementById(id),f=n=>Number(n).toLocaleString("zh-TW",{maximumFractionDigits:2});
 function stext(id,text){$(id).textContent=text}
+function safe(x){return String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 async function reload(){
  try{
  const resp=await fetch("/api/status",{cache:"no-store"});if(!resp.ok)throw Error("HTTP "+resp.status);
  const data=await resp.json(),online=data.market_data==="CONNECTED";
+ $("symbol").innerHTML=(data.watchlist||[]).map(v=>`<option value="${v.symbol}">${v.symbol} ${safe(v.name)}</option>`).join("");
  const policy=data.policy||{};
  stext("policyInfo","策略版本："+(policy.version||"—")+"｜自動下單："+(policy.auto_order?"啟用（應禁止）":"永久關閉，僅輔助決策")+"｜每日損失預算不是券商硬停損");
  $("connection").className="status"+(online?" ready":"");
@@ -39,7 +41,7 @@ async function reload(){
  const avg=v.average_price!=null?"成交均價 "+f(v.average_price):"無有效均價";
  const time=v.timestamp?"｜"+v.timestamp:"";
  const grade=v.status==="候選訊號"?"A｜可試單（人工確認）":v.status==="取消交易"?"D｜取消交易":v.status==="不追價"?"C｜不追價":v.status==="觀察"?"B｜觀察":"E｜資料不足";
- return '<div class="stock"><div class="flex"><div><b>'+v.name+'</b> <span class="small">'+v.symbol+' · '+v.sector+'</span></div><span class="pill '+cls+'">'+grade+'</span></div><div class="flex" style="margin-top:5px"><div><span class="value">'+price+'</span><span class="small"> '+(v.change_rate!=null?v.change_rate+"%":"")+'</span></div><span class="small">'+avg+'</span></div><div class="small">'+(v.reason||"尚無資料")+time+'</div></div>';
+ return '<div class="stock"><div class="flex"><div><b>'+safe(v.name)+'</b> <span class="small">'+v.symbol+' · '+safe(v.sector)+'</span></div><span class="pill '+cls+'">'+grade+'</span></div><div class="flex" style="margin-top:5px"><div><span class="value">'+price+'</span><span class="small"> '+(v.change_rate!=null?v.change_rate+"%":"")+'</span></div><span class="small">'+avg+'</span></div><div class="small">'+(safe(v.reason||"尚無資料"))+safe(time)+'</div><button class="outline" style="max-width:120px;padding:7px" data-remove="'+v.symbol+'">移除監控</button></div>';
  }).join("");
  $("sectors").innerHTML=data.sectors.length?data.sectors.map(s=>'<div class="flex" style="padding:9px 0;border-bottom:1px solid #34455f"><b>'+s.sector+'</b><span class="'+(s.average_change_rate>=0?"positive":"negative")+'">'+s.average_change_rate+'% <span class="small">('+s.stocks+'/'+s.coverage+'檔)</span></span></div>').join(""):"板塊行情未連線，暫無輪動排序。";
  $("alerts").innerHTML=data.alerts.length?data.alerts.map(a=>'<div class="stock"><b>'+a.state+' · '+a.symbol+'</b><div class="small">'+a.time+'｜'+(a.push&&a.push.sent?"已推送到裝置服務":"未確認網頁推播")+'</div><div class="small">'+a.message.replaceAll("\n"," · ")+'</div></div>').join(""):"目前沒有符合條件的候選訊號。";
@@ -51,6 +53,24 @@ async function reload(){
  }catch(e){stext("connection","伺服器連線異常："+e.message);$("connection").className="status"}
 }
 $("refresh").onclick=reload;
+$("addSymbol").onclick=async()=>{
+ const symbol=$("newSymbol").value.trim(),name=$("newName").value.trim();
+ if(!/^[0-9]{4}$/.test(symbol)||!name){stext("watchMessage","請輸入4位數代號與股票名稱");return}
+ try{
+  const r=await fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol,name,sector:"自選"})});
+  const d=await r.json();if(!r.ok)throw Error(d.detail||"新增失敗");
+  stext("watchMessage",d.message);$("newSymbol").value="";$("newName").value="";await reload();
+ }catch(e){stext("watchMessage",e.message)}
+};
+$("watch").addEventListener("click",async e=>{
+ const symbol=e.target.dataset.remove;if(!symbol)return;
+ if(!confirm("確認移除 "+symbol+" 的監控？不會刪除交易紀錄。"))return;
+ try{
+  const r=await fetch("/api/watchlist/"+encodeURIComponent(symbol),{method:"DELETE"});const d=await r.json();
+  if(!r.ok)throw Error(d.detail||"移除失敗");
+  stext("watchMessage",d.message);await reload();
+ }catch(err){stext("watchMessage",err.message)}
+});
 $("calc").onclick=async()=>{
  try{const p={entry:+$("entry").value,stop:+$("stop").value,target:+$("target").value,lots:+$("lots").value,overnight:$("overnight").checked};
  const r=await fetch("/api/risk",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});let d=await r.json();if(!r.ok)throw Error("請檢查輸入");
