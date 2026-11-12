@@ -1,0 +1,17 @@
+{
+  "name": "台股當沖決策中心",
+  "short_name": "台股監控",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1422",
+  "theme_color": "#0b1422",
+  "icons": [
+    {
+      "src": "/push-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
