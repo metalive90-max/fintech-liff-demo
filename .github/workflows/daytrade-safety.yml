@@ -4,6 +4,10 @@ on:
     paths:
       - 'app.py'
       - 'tests/**'
+      - 'netlify.toml'
+      - 'netlify-build.sh'
+      - 'netlify-site/**'
+      - 'daytrade-dashboard.html'
       - '.github/workflows/daytrade-safety.yml'
   push:
     branches: [feature/watchlist-manager-netlify-preview]
@@ -17,6 +21,8 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+      - name: Prepare Netlify static site
+        run: sh netlify-build.sh
       - name: Compile backend
         run: python -m py_compile app.py
       - name: Run fail-closed trading tests
