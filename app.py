@@ -26,7 +26,7 @@ DB_PATH=os.environ.get("DB_PATH","/tmp/daytrade-v12.sqlite3")
 VAPID_PRIVATE_B64=os.environ.get("VAPID_PRIVATE_KEY_B64","").strip()
 VAPID_PUBLIC=os.environ.get("VAPID_PUBLIC_KEY","").strip()
 VAPID_SUBJECT=os.environ.get("VAPID_SUBJECT","https://tw-daytrade-mobile-2026.onrender.com")
-POLL_SECONDS=max(30,int(os.environ.get("POLL_SECONDS","30")))
+POLL_SECONDS=max(60,int(os.environ.get("POLL_SECONDS","60")))
 MAX_AGE=90
 CAPITAL=800000
 DAILY_LOSS=10000
@@ -48,6 +48,12 @@ sent_alerts={}
 task=None
 FUGLE_URL="https://api.fugle.tw/marketdata/v1.0/stock/"
 CORE_SYMBOLS=("2449","6173","2327")
+MAX_WATCHED=8
+WATCH_NAMES=dict(WATCH)
+def active_symbols():
+ with db() as c:
+  return [row[0] for row in c.execute("SELECT symbol FROM watchlist ORDER BY added_at, symbol")]
+
 TWSE_URL="https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 public_state={"last_checked":None,"as_of":None,"error":"尚未取得 TWSE 公開資料","references":{}}
 last_candles={}
@@ -59,6 +65,11 @@ def db():
  c=sqlite3.connect(DB_PATH,timeout=3)
  c.execute("CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, symbol TEXT NOT NULL, side TEXT NOT NULL, price REAL NOT NULL, shares INT NOT NULL, fee REAL NOT NULL, created_at TEXT NOT NULL)")
  c.execute("CREATE TABLE IF NOT EXISTS push_subscriptions (endpoint TEXT PRIMARY KEY, subscription_json TEXT NOT NULL, created_at TEXT NOT NULL)")
+ c.execute("CREATE TABLE IF NOT EXISTS watchlist (symbol TEXT PRIMARY KEY, name TEXT NOT NULL, sector TEXT NOT NULL, added_at TEXT NOT NULL)")
+ if not c.execute("SELECT 1 FROM watchlist LIMIT 1").fetchone() and not c.execute("SELECT 1 FROM sqlite_master WHERE name=\'watchlist_initialized\'").fetchone():
+  c.executemany("INSERT INTO watchlist(symbol,name,sector,added_at) VALUES(?,?,?,?)",[(sid,WATCH[sid][0],WATCH[sid][1],now().isoformat()) for sid in CORE_SYMBOLS])
+  c.execute("CREATE TABLE watchlist_initialized (once INTEGER PRIMARY KEY)")
+  c.execute("INSERT INTO watchlist_initialized(once) VALUES(1)")
  c.commit()
  return c
 def pnl():
@@ -134,7 +145,7 @@ def sector_rank():
  grouped=defaultdict(list)
  for q in market_quotes():
   cr=num(q,"change_rate")
-  if cr is not None: grouped[WATCH[q["stock_id"]][1]].append(cr)
+  if cr is not None and q["stock_id"] in active_symbols(): grouped[WATCH[q["stock_id"]][1]].append(cr)
  return sorted([{"sector":name,"average_change_rate":round(sum(v)/len(v),2),"stocks":len(v),"coverage":sum(1 for sid in WATCH if WATCH[sid][1]==name)} for name,v in grouped.items()],key=lambda x:x["average_change_rate"],reverse=True)
 DECISION_POLICY={
  "version":"1.0","role":"AI 首席交易決策官（規則式決策輔助，非保證預測）",
@@ -194,10 +205,10 @@ def fetch_snapshot_sync():
  global last_candle_refresh
  records=[];errors=[]
  need_candles=(time.monotonic()-last_candle_refresh>100)
- for sid in CORE_SYMBOLS:
+ for sid in active_symbols():
   try:
    src=fugle_get("intraday/quote/"+sid)
-   if src.get("symbol")!=sid or src.get("isTrial") or src.get("tradingHalt",{}).get("isHalted"):
+   if str(src.get("symbol"))!=sid or src.get("isTrial") or src.get("tradingHalt",{}).get("isHalted"):
     errors.append(sid+" 資料不適用");continue
    stamp=timestamp_to_local(src.get("closeTime") or src.get("lastTrade",{}).get("time"))
    if stamp is None or src.get("date")!=stamp.date().isoformat():
@@ -256,7 +267,7 @@ def twse_fetch_sync():
  for row in rows:
   if not isinstance(row,dict):continue
   sid=str(row.get("Code") or row.get("code") or "")
-  if sid in CORE_SYMBOLS:
+  if sid in active_symbols():
    refs[sid]={"date":str(row.get("Date","")),"closing_price":row.get("ClosingPrice"),
      "trade_volume":row.get("TradeVolume"),"source":"TWSE STOCK_DAY_ALL 盤後"}
  return refs
@@ -292,7 +303,7 @@ async def monitor_once():
  cache["error"]=None
  for item in records:
   sid=str(item.get("stock_id",""))
-  if sid not in WATCH:continue
+  if sid not in active_symbols():continue
   t=parse_time(item.get("date"))
   if not t:continue
   prev=cache["quotes"].get(sid)
@@ -358,7 +369,8 @@ def get_policy():return DECISION_POLICY
 def status():
  book=ledger();groups=sector_rank()
  entries=[]
- for sid,(name,sec) in WATCH.items():
+ for sid in active_symbols():
+  name,sec=WATCH.get(sid,(sid,"自選"))
   q=cache["quotes"].get(sid)
   if not q:
    entries.append({"symbol":sid,"name":name,"sector":sec,"status":"資料未連線","price":None,"average_price":None,"timestamp":None})
@@ -366,12 +378,42 @@ def status():
   label,reason,setup=signal(q)
   entries.append({"symbol":sid,"name":name,"sector":sec,"price":num(q,"close"),"average_price":num(q,"average_price"),"high":num(q,"high"),"low":num(q,"low"),"change_rate":num(q,"change_rate"),"total_volume":num(q,"total_volume"),"volume_ratio":num(q,"volume_ratio"),"timestamp":q.get("date"),"fresh":fresh(q),"status":label,"reason":reason,"setup":setup})
  return {"now":now().isoformat(),"market_data":"CONNECTED" if FUGLE_API_KEY and market_quotes() else "DISCONNECTED",
- "provider":"Fugle 免費個股 REST（3檔）" if FUGLE_API_KEY else "未設定 Fugle API Key",
+ "provider":"Fugle 免費個股 REST（自選逐檔查詢）" if FUGLE_API_KEY else "未設定 Fugle API Key",
  "provider_vwap_type":"Fugle avgPrice 當日成交均價（非自行重建逐筆 VWAP）",
  "market_message":cache["error"] or ("盤中行情已連線" if market_quotes() else "尚無當日新鮮快照；禁止買進提示"),
  "last_fetch":cache["last_fetch"],"public_reference":{"source":"TWSE STOCK_DAY_ALL 盤後","as_of":public_state["as_of"],"error":public_state["error"],"symbols":public_state["references"]},"auto_order":False,"capital_limit":CAPITAL,"daily_loss_limit":DAILY_LOSS,"max_lots":MAX_LOTS,
  "policy":DECISION_POLICY,"telegram_configured":bool(TG_TOKEN and TG_CHAT),"webpush_configured":bool(VAPID_PRIVATE_B64 and VAPID_PUBLIC),"persistence":book["persistent"],
- "ledger":{k:v for k,v in book.items() if k!="trades"},"sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10]}
+ "ledger":{k:v for k,v in book.items() if k!="trades"},"sectors":groups,"symbols":entries,"alerts":cache["last_alerts"][:10],"max_watched":MAX_WATCHED,"watchlist":[{"symbol":x,"name":WATCH[x][0],"sector":WATCH[x][1]} for x in active_symbols()]}
+class WatchRequest(BaseModel):
+ symbol:str=Field(pattern=r"^[0-9]{4}$")
+ name:str=Field(min_length=1,max_length=30)
+ sector:str=Field(default="自選",min_length=1,max_length=30)
+@app.get("/api/watchlist")
+def get_watchlist():
+ return {"max_watched":MAX_WATCHED,"items":[{"symbol":sid,"name":WATCH[sid][0],"sector":WATCH[sid][1]} for sid in active_symbols()]}
+@app.post("/api/watchlist")
+def add_watchlist(v:WatchRequest):
+ sid=v.symbol
+ name=v.name.strip()
+ sector=v.sector.strip()
+ if not name or not sector:raise HTTPException(422,"請填寫股票名稱與分類")
+ with db() as c:
+  existing=c.execute("SELECT 1 FROM watchlist WHERE symbol=?",(sid,)).fetchone()
+  if existing:raise HTTPException(409,"此股票已在監控清單")
+  count=c.execute("SELECT COUNT(*) FROM watchlist").fetchone()[0]
+  if count>=MAX_WATCHED:raise HTTPException(409,f"目前最多監控{MAX_WATCHED}檔，請先刪除其他標的")
+  c.execute("INSERT INTO watchlist(symbol,name,sector,added_at) VALUES(?,?,?,?)",(sid,name,sector,now().isoformat()))
+ WATCH[sid]=(name,sector)
+ return {"ok":True,"message":"已加入逐檔行情查詢與監測排程；有效訊號取決於行情權限及新鮮度","symbol":sid}
+@app.delete("/api/watchlist/{symbol}")
+def remove_watchlist(symbol:str):
+ if not re.fullmatch(r"[0-9]{4}",symbol):raise HTTPException(422,"股票代號格式錯誤")
+ with db() as c:
+  result=c.execute("DELETE FROM watchlist WHERE symbol=?",(symbol,))
+  if result.rowcount==0:raise HTTPException(404,"找不到此監控標的")
+ cache["quotes"].pop(symbol,None)
+ history.pop(symbol,None)
+ return {"ok":True,"message":"已移除監控，不再對該股產生新通知","symbol":symbol}
 class RiskRequest(BaseModel):
  entry:float=Field(gt=0)
  stop:float=Field(gt=0)
@@ -388,7 +430,7 @@ class TradeRequest(BaseModel):
  overnight:bool=False
 @app.post("/api/trades")
 def add_trade(v:TradeRequest):
- if v.symbol not in WATCH:raise HTTPException(status_code=400,detail="not in watchlist")
+ if v.symbol not in WATCH:raise HTTPException(status_code=400,detail="unknown stock symbol")
  # Manual register only, not brokerage orders.
  fee=v.price*v.shares*(COMMISSION+(.003 if v.side=="SELL" and v.overnight else .0015 if v.side=="SELL" else 0))
  with db() as c:c.execute("INSERT INTO trades(day,symbol,side,price,shares,fee,created_at) VALUES(?,?,?,?,?,?,?)",(local_date(),v.symbol,v.side,v.price,v.shares,fee,now().isoformat()))
