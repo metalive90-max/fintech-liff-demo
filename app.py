@@ -52,7 +52,9 @@ MAX_WATCHED=8
 WATCH_NAMES=dict(WATCH)
 def active_symbols():
  with db() as c:
-  return [row[0] for row in c.execute("SELECT symbol FROM watchlist ORDER BY added_at, symbol")]
+  rows=c.execute("SELECT symbol,name,sector FROM watchlist ORDER BY added_at, symbol").fetchall()
+ for sid,name,sector in rows:WATCH[sid]=(name,sector)
+ return [row[0] for row in rows]
 
 TWSE_URL="https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 public_state={"last_checked":None,"as_of":None,"error":"尚未取得 TWSE 公開資料","references":{}}
@@ -66,7 +68,7 @@ def db():
  c.execute("CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, symbol TEXT NOT NULL, side TEXT NOT NULL, price REAL NOT NULL, shares INT NOT NULL, fee REAL NOT NULL, created_at TEXT NOT NULL)")
  c.execute("CREATE TABLE IF NOT EXISTS push_subscriptions (endpoint TEXT PRIMARY KEY, subscription_json TEXT NOT NULL, created_at TEXT NOT NULL)")
  c.execute("CREATE TABLE IF NOT EXISTS watchlist (symbol TEXT PRIMARY KEY, name TEXT NOT NULL, sector TEXT NOT NULL, added_at TEXT NOT NULL)")
- if not c.execute("SELECT 1 FROM watchlist LIMIT 1").fetchone() and not c.execute("SELECT 1 FROM sqlite_master WHERE name=\'watchlist_initialized\'").fetchone():
+ if not c.execute("SELECT 1 FROM sqlite_master WHERE name=\'watchlist_initialized\'").fetchone():
   c.executemany("INSERT INTO watchlist(symbol,name,sector,added_at) VALUES(?,?,?,?)",[(sid,WATCH[sid][0],WATCH[sid][1],now().isoformat()) for sid in CORE_SYMBOLS])
   c.execute("CREATE TABLE watchlist_initialized (once INTEGER PRIMARY KEY)")
   c.execute("INSERT INTO watchlist_initialized(once) VALUES(1)")
@@ -165,9 +167,9 @@ def signal(q):
  if not market_open():return "資料不足","E｜非交易時段；不發出買點",None
  if not all(v and v>0 for v in (close,avg,high,lo)):return "資料不足","E｜價格資料不完整",None
  if not q.get("five_min_confirmed") or (q.get("candle_count") or 0)<5:
-  return "觀察","B｜5分鐘K線尚未完成價量確認",None
+  return "資料不足","E｜5分鐘K線價量確認不足，禁止交易訊號",None
  if close<avg*.992:
-  return "取消交易","D｜跌破當日均價0.8%，短線轉弱",None
+  return "觀察","B｜低於當日均價，但尚未確認關鍵支撐破位",None
  if not hist or len(hist)<4:return "觀察","B｜需要至少四筆有效快照評估動能",None
  earlier=hist[-4][1]
  momentum=(close-earlier)/earlier if earlier else 0
@@ -297,10 +299,7 @@ def telegram_sync(message):
 async def monitor_once():
  records,err=await asyncio.to_thread(fetch_snapshot_sync)
  cache["last_fetch"]=now().isoformat()
- if err:
-  cache["error"]=err
-  return
- cache["error"]=None
+ cache["error"]=err
  for item in records:
   sid=str(item.get("stock_id",""))
   if sid not in active_symbols():continue
@@ -314,7 +313,7 @@ async def monitor_once():
   close=num(item,"close")
   if close and fresh(item):history[sid].append((t,close))
   state,reason,setup=signal(item)
-  if state in ("候選訊號","取消交易") and market_open():
+  if state in ("候選訊號","取消交易") and market_open() and fresh(item):
    key=f"{local_date()}:{sid}:{state}"
    prev_alert=sent_alerts.get(key,0)
    if time.time()-prev_alert>1800:
@@ -397,6 +396,7 @@ def add_watchlist(v:WatchRequest):
  name=v.name.strip()
  sector=v.sector.strip()
  if not name or not sector:raise HTTPException(422,"請填寫股票名稱與分類")
+ if sid not in WATCH_NAMES:raise HTTPException(422,"此代號尚未完成證交所上市股票主檔驗證，暫不加入監控，避免錯誤訊號")
  with db() as c:
   existing=c.execute("SELECT 1 FROM watchlist WHERE symbol=?",(sid,)).fetchone()
   if existing:raise HTTPException(409,"此股票已在監控清單")
