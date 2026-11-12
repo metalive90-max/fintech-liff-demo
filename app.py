@@ -148,7 +148,7 @@ def sector_rank():
  for q in market_quotes():
   cr=num(q,"change_rate")
   if cr is not None and q["stock_id"] in active_symbols(): grouped[WATCH[q["stock_id"]][1]].append(cr)
- return sorted([{"sector":name,"average_change_rate":round(sum(v)/len(v),2),"stocks":len(v),"coverage":sum(1 for sid in WATCH if WATCH[sid][1]==name)} for name,v in grouped.items()],key=lambda x:x["average_change_rate"],reverse=True)
+ return sorted([{"sector":name,"average_change_rate":round(sum(v)/len(v),2),"stocks":len(v),"coverage":sum(1 for sid in active_symbols() if WATCH[sid][1]==name)} for name,v in grouped.items()],key=lambda x:x["average_change_rate"],reverse=True)
 DECISION_POLICY={
  "version":"1.0","role":"AI 首席交易決策官（規則式決策輔助，非保證預測）",
  "levels":[{"code":"A","name":"可試單","meaning":"即時行情及價量訊號符合規則，費稅滑價後風險在限額內；仍需自行確認券商當沖資格與大盤"},
@@ -396,7 +396,13 @@ def add_watchlist(v:WatchRequest):
  name=v.name.strip()
  sector=v.sector.strip()
  if not name or not sector:raise HTTPException(422,"請填寫股票名稱與分類")
- if sid not in WATCH_NAMES:raise HTTPException(422,"此代號尚未完成證交所上市股票主檔驗證，暫不加入監控，避免錯誤訊號")
+ if not FUGLE_API_KEY:raise HTTPException(503,"行情 API 尚未設定，無法驗證股票代號；暫停新增，避免監控錯誤標的")
+ try:
+  verification=fugle_get("intraday/quote/"+sid)
+  if str(verification.get("symbol"))!=sid or verification.get("isTrial"):
+   raise HTTPException(422,"行情來源無法驗證此股票代號")
+ except HTTPException:raise
+ except Exception:raise HTTPException(503,"行情來源暫時無法驗證股票代號，請稍後重試")
  with db() as c:
   existing=c.execute("SELECT 1 FROM watchlist WHERE symbol=?",(sid,)).fetchone()
   if existing:raise HTTPException(409,"此股票已在監控清單")
