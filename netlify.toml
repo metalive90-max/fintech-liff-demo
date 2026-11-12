@@ -1,0 +1,27 @@
+[build]
+  command = "sh netlify-build.sh"
+  publish = "netlify-site"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://tw-daytrade-mobile-2026.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "https://tw-daytrade-mobile-2026.onrender.com/health"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
